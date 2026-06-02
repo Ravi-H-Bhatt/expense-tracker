@@ -1,8 +1,28 @@
 import Groq from 'groq-sdk';
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+let groqInstance: Groq | null = null;
+
+function getGroqClient(): Groq {
+  if (!groqInstance) {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      throw new Error('GROQ_API_KEY environment variable is not set');
+    }
+    groqInstance = new Groq({ apiKey });
+  }
+  return groqInstance;
+}
+
+// Lazy getter for backward compatibility
+const groqHandler = {
+  get(target: any, prop: string) {
+    const client = getGroqClient();
+    const value = (client as any)[prop];
+    return typeof value === 'function' ? value.bind(client) : value;
+  }
+};
+
+const groq = new Proxy({} as Groq, groqHandler);
 
 export default groq;
 
