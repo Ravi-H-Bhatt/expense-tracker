@@ -74,7 +74,7 @@ export default function AnalyticsCharts({
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, percent }: { name?: string; percent?: number }) => `${name || ''} ${percent ? (percent * 100).toFixed(0) : 0}%`}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
@@ -83,7 +83,7 @@ export default function AnalyticsCharts({
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                  <Tooltip formatter={(value: any) => value ? formatCurrency(value as number) : '₹0'} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -105,7 +105,7 @@ export default function AnalyticsCharts({
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                  <Tooltip formatter={(value: any) => value ? formatCurrency(value as number) : '₹0'} />
                   <Line type="monotone" dataKey="amount" stroke="#E07A5F" strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
@@ -129,7 +129,7 @@ export default function AnalyticsCharts({
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                <Tooltip formatter={(value: any) => value ? formatCurrency(value as number) : '₹0'} />
                 <Bar dataKey="value" fill="#E07A5F" />
               </BarChart>
             </ResponsiveContainer>

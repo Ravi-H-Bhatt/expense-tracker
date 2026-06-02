@@ -2,12 +2,13 @@ import groq, { AI_MODEL } from './groq-client';
 import { ExpenseCategory, PaymentMethod } from '@/types';
 
 export interface ParsedCommand {
-  intent: 'add_expense' | 'set_budget' | 'split_expense' | 'query' | 'unknown';
+  intent: 'add_expense' | 'set_budget' | 'split_expense' | 'query' | 'trip_plan' | 'unknown';
   expense?: {
     amount: number;
     category: ExpenseCategory;
     notes?: string;
     payment_method?: PaymentMethod;
+    location?: string;
   };
   budget?: {
     category: ExpenseCategory;
@@ -19,6 +20,11 @@ export interface ParsedCommand {
     category: ExpenseCategory;
     people: string[];
     notes?: string;
+  };
+  trip?: {
+    destination: string;
+    start_date?: string;
+    budget?: number;
   };
   query?: {
     type: 'spending' | 'savings' | 'trends' | 'recommendations' | 'general';
