@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import { Check, Clock } from 'lucide-react';
+import { Check, Clock, Trash2, AlertCircle } from 'lucide-react';
 
 interface ChatMessageProps {
   message: any;
@@ -12,6 +12,7 @@ interface ChatMessageProps {
   members: any[];
   currentUser: any;
   onExpenseUpdate: () => void;
+  onDeleteExpense?: (expenseId: string) => void;
 }
 
 export default function ChatMessage({
@@ -21,7 +22,8 @@ export default function ChatMessage({
   splits,
   members,
   currentUser,
-  onExpenseUpdate
+  onExpenseUpdate,
+  onDeleteExpense
 }: ChatMessageProps) {
   const supabase = createClient();
 
@@ -58,6 +60,26 @@ export default function ChatMessage({
       console.error(error);
     }
   };
+
+  // AI error message
+  if (message.message_type === 'ai_error') {
+    return (
+      <div className="flex items-start gap-3">
+        <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+          <AlertCircle className="w-5 h-5 text-white" />
+        </div>
+        <div className="flex-1 max-w-2xl">
+          <p className="text-xs text-red-600 mb-1 font-['var(--font-dm-sans)'] font-semibold">Error</p>
+          <div className="bg-red-50 border border-red-200 rounded-2xl rounded-bl-sm px-4 py-3">
+            <p className="text-red-800 font-['var(--font-dm-sans)'] whitespace-pre-wrap text-sm">{message.content}</p>
+            <span className="text-xs text-red-600 opacity-60 mt-1 block">
+              {formatTime(message.created_at)}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Regular chat message
   if (message.message_type === 'chat') {
@@ -109,51 +131,64 @@ export default function ChatMessage({
     );
   }
 
-  // Expense log message
+  // Expense log message with embedded card
   if (message.message_type === 'expense_log') {
     const expenseData = message.metadata;
     const isGroupFund = expenseData.isGroupFundExpense;
+    const expense = expenses.find(e => e.description === expenseData.description);
 
     return (
       <div className="w-full max-w-3xl mx-auto">
-        <div className="bg-[#FFF8F0] border border-[#F0E0C8] rounded-2xl p-5">
+        <div className="bg-[#FFF8F0] border border-[#F0E0C8] rounded-2xl p-4 lg:p-5">
           {/* Header */}
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-2xl">💸</span>
-                <h4 className="font-['var(--font-playfair)'] font-semibold text-[#1A1208] text-lg">
+                <h4 className="font-['var(--font-playfair)'] font-semibold text-[#1A1208] text-base lg:text-lg">
                   {expenseData.description}
                 </h4>
               </div>
               {expenseData.paidByName && !isGroupFund && (
-                <p className="text-sm text-[#6B5744] font-['var(--font-dm-sans)']">
+                <p className="text-xs lg:text-sm text-[#6B5744] font-['var(--font-dm-sans)']">
                   Paid by: <span className="font-semibold">{expenseData.paidByName}</span>
                 </p>
               )}
             </div>
-            <div className="text-right">
-              <p className="text-2xl font-['var(--font-playfair)'] font-bold text-[#8B4513]">
+            <div className="flex items-center gap-2">
+              <p className="text-xl lg:text-2xl font-['var(--font-playfair)'] font-bold text-[#8B4513]">
                 {formatCurrency(expenseData.totalAmount)}
               </p>
+              {expense && onDeleteExpense && (
+                <button
+                  onClick={() => {
+                    if (confirm('Delete this expense? This will recalculate all balances.')) {
+                      onDeleteExpense(expense.id);
+                    }
+                  }}
+                  className="p-1.5 hover:bg-red-50 rounded-lg transition-colors group"
+                  title="Delete expense"
+                >
+                  <Trash2 className="w-4 h-4 text-[#6B5744] group-hover:text-red-600" />
+                </button>
+              )}
             </div>
           </div>
 
           {/* Splits or Group Fund Message */}
           {isGroupFund ? (
-            <div className="bg-[#FFF3CD] border border-[#F0C040] rounded-xl px-4 py-3 flex items-center gap-2">
+            <div className="bg-[#FFF3CD] border border-[#F0C040] rounded-xl px-3 lg:px-4 py-2 lg:py-3 flex items-center gap-2">
               <span>📦</span>
-              <span className="text-sm font-['var(--font-dm-sans)'] text-[#8B4513]">
+              <span className="text-xs lg:text-sm font-['var(--font-dm-sans)'] text-[#8B4513]">
                 Paid from Group Fund — no individual debts
               </span>
             </div>
           ) : expenseData.splits && expenseData.splits.length > 0 ? (
             <div>
-              <div className="h-px bg-[#E8DDD0] my-4" />
-              <div className="space-y-2">
+              <div className="h-px bg-[#E8DDD0] my-3" />
+              <div className="space-y-1.5 lg:space-y-2">
                 {expenseData.splits.map((split: any, idx: number) => {
                   // Find if this split is settled
-                  const expense = expenses.find(e => e.description === expenseData.description);
                   const splitRecord = expense 
                     ? splits.find(s => s.expense_id === expense.id && s.display_name === split.name)
                     : null;
@@ -161,33 +196,33 @@ export default function ChatMessage({
                   const isPayer = split.name === expenseData.paidByName;
 
                   return (
-                    <div key={idx} className="flex items-center justify-between py-2">
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className="w-8 h-8 rounded-full bg-[#8B4513] text-white flex items-center justify-center text-sm font-semibold">
+                    <div key={idx} className="flex items-center justify-between py-1.5 lg:py-2">
+                      <div className="flex items-center gap-2 lg:gap-3 flex-1">
+                        <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-full bg-[#8B4513] text-white flex items-center justify-center text-xs lg:text-sm font-semibold">
                           {split.name[0].toUpperCase()}
                         </div>
-                        <span className="font-['var(--font-dm-sans)'] font-medium text-[#1A1208]">
+                        <span className="font-['var(--font-dm-sans)'] font-medium text-[#1A1208] text-sm lg:text-base">
                           {split.name}
                         </span>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <span className="font-['var(--font-dm-sans)'] font-semibold text-[#8B4513]">
+                      <div className="flex items-center gap-3 lg:gap-4">
+                        <span className="font-['var(--font-dm-sans)'] font-semibold text-[#8B4513] text-sm lg:text-base">
                           {formatCurrency(split.amount)}
                         </span>
                         {isPayer ? (
-                          <span className="flex items-center gap-1 text-sm text-green-600 font-['var(--font-dm-sans)']">
-                            <Check className="w-4 h-4" />
-                            paid
+                          <span className="flex items-center gap-1 text-xs lg:text-sm text-green-600 font-['var(--font-dm-sans)']">
+                            <Check className="w-3 h-3 lg:w-4 lg:h-4" />
+                            <span className="hidden sm:inline">paid</span>
                           </span>
                         ) : isSettled ? (
-                          <span className="flex items-center gap-1 text-sm text-green-600 font-['var(--font-dm-sans)']">
-                            <Check className="w-4 h-4" />
-                            settled
+                          <span className="flex items-center gap-1 text-xs lg:text-sm text-green-600 font-['var(--font-dm-sans)']">
+                            <Check className="w-3 h-3 lg:w-4 lg:h-4" />
+                            <span className="hidden sm:inline">settled</span>
                           </span>
                         ) : (
-                          <span className="flex items-center gap-1 text-sm text-orange-600 font-['var(--font-dm-sans)']">
-                            <Clock className="w-4 h-4" />
-                            owes
+                          <span className="flex items-center gap-1 text-xs lg:text-sm text-orange-600 font-['var(--font-dm-sans)']">
+                            <Clock className="w-3 h-3 lg:w-4 lg:h-4" />
+                            <span className="hidden sm:inline">owes</span>
                           </span>
                         )}
                       </div>
@@ -199,8 +234,11 @@ export default function ChatMessage({
           ) : null}
 
           {/* Timestamp */}
-          <p className="text-xs text-[#6B5744] mt-4 text-right font-['var(--font-dm-sans)']">
-            Added on {new Date(message.created_at).toLocaleString('en-IN')}
+          <p className="text-xs text-[#6B5744] mt-3 lg:mt-4 text-right font-['var(--font-dm-sans)']">
+            Added on {new Date(message.created_at).toLocaleString('en-IN', { 
+              dateStyle: 'medium', 
+              timeStyle: 'short' 
+            })}
           </p>
         </div>
       </div>
