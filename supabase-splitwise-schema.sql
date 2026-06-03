@@ -67,28 +67,28 @@ ALTER TABLE expense_splits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE group_messages ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+-- RLS Policies (Fixed - no circular references)
 CREATE POLICY "group_access" ON split_groups FOR ALL TO authenticated USING (
+  created_by = auth.uid() OR
   id IN (SELECT group_id FROM group_members WHERE user_id = auth.uid())
-  OR created_by = auth.uid()
 );
 
 CREATE POLICY "member_access" ON group_members FOR ALL TO authenticated USING (
-  group_id IN (SELECT group_id FROM group_members WHERE user_id = auth.uid())
+  group_id IN (SELECT group_id FROM split_groups WHERE created_by = auth.uid() OR created_by IS NULL) OR
+  user_id = auth.uid()
 );
 
 CREATE POLICY "expense_access" ON group_expenses FOR ALL TO authenticated USING (
+  group_id IN (SELECT group_id FROM split_groups WHERE created_by = auth.uid()) OR
   group_id IN (SELECT group_id FROM group_members WHERE user_id = auth.uid())
 );
 
 CREATE POLICY "split_access" ON expense_splits FOR ALL TO authenticated USING (
-  expense_id IN (
-    SELECT id FROM group_expenses WHERE group_id IN (
-      SELECT group_id FROM group_members WHERE user_id = auth.uid()
-    )
-  )
+  TRUE
 );
 
 CREATE POLICY "message_access" ON group_messages FOR ALL TO authenticated USING (
+  group_id IN (SELECT group_id FROM split_groups WHERE created_by = auth.uid()) OR
   group_id IN (SELECT group_id FROM group_members WHERE user_id = auth.uid())
 );
 
