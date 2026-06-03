@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import { Users, Copy, Check } from 'lucide-react';
+import { Users, Copy, Check, Plus } from 'lucide-react';
 import ChatMessage from './ChatMessage';
 import GroupSummary from './GroupSummary';
 import ExpenseConfirmCard from './ExpenseConfirmCard';
+import ManualExpenseModal from './ManualExpenseModal';
 
 interface GroupWorkspaceProps {
   groupId: string;
@@ -28,6 +29,7 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
   const [pendingExpense, setPendingExpense] = useState<any>(null);
   const [showInviteLink, setShowInviteLink] = useState(false);
   const [inviteLinkCopied, setInviteLinkCopied] = useState(false);
+  const [showManualExpense, setShowManualExpense] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -336,21 +338,30 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
   return (
     <div className="h-full flex flex-col">
       {/* Top Bar */}
-      <div className="h-16 border-b border-border px-6 flex items-center justify-between bg-white">
-        <div className="flex items-center gap-4">
-          <h2 className="text-xl font-['var(--font-playfair)'] font-semibold text-[#1A1208]">
+      <div className="h-14 lg:h-16 border-b border-border px-3 lg:px-6 flex items-center justify-between bg-white sticky top-0 z-20">
+        <div className="flex items-center gap-2 lg:gap-4 flex-1 min-w-0">
+          <h2 className="text-lg lg:text-xl font-['var(--font-playfair)'] font-semibold text-[#1A1208] truncate">
             {group.name}
           </h2>
           {group.group_fund > 0 && (
-            <div className="px-3 py-1 bg-[#FFF3CD] rounded-full text-sm font-['var(--font-dm-sans)'] font-medium text-[#8B4513]">
+            <div className="hidden sm:flex px-3 py-1 bg-[#FFF3CD] rounded-full text-xs lg:text-sm font-['var(--font-dm-sans)'] font-medium text-[#8B4513] whitespace-nowrap">
               Fund: {formatCurrency(group.group_fund)}
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Member avatars */}
-          <div className="flex -space-x-2">
+        <div className="flex items-center gap-2 lg:gap-3">
+          {/* Add Expense Button - Mobile friendly */}
+          <button
+            onClick={() => setShowManualExpense(true)}
+            className="px-2.5 lg:px-4 py-1.5 lg:py-2 bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors text-xs lg:text-sm font-['var(--font-dm-sans)'] font-medium flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Add</span>
+          </button>
+
+          {/* Member avatars - Hidden on small mobile */}
+          <div className="hidden md:flex -space-x-2">
             {members.slice(0, 5).map((member, idx) => (
               <div
                 key={member.id}
@@ -369,28 +380,28 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
 
           <button
             onClick={() => setShowInviteLink(!showInviteLink)}
-            className="px-4 py-2 border border-[#8B4513] text-[#8B4513] rounded-lg hover:bg-[#8B4513] hover:text-white transition-colors text-sm font-['var(--font-dm-sans)'] font-medium"
+            className="px-2.5 lg:px-4 py-1.5 lg:py-2 border border-[#8B4513] text-[#8B4513] rounded-lg hover:bg-[#8B4513] hover:text-white transition-colors text-xs lg:text-sm font-['var(--font-dm-sans)'] font-medium"
           >
-            <Users className="w-4 h-4 inline mr-1.5" />
-            Invite
+            <Users className="w-4 h-4 lg:inline" />
+            <span className="hidden lg:inline ml-1.5">Invite</span>
           </button>
         </div>
       </div>
 
       {/* Invite Link Banner */}
       {showInviteLink && (
-        <div className="bg-[#FFF3CD] border-b border-[#F0C040] px-6 py-3 flex items-center justify-between">
-          <div className="flex-1">
-            <p className="text-sm font-['var(--font-dm-sans)'] text-[#8B4513] mb-1">
+        <div className="bg-[#FFF3CD] border-b border-[#F0C040] px-3 lg:px-6 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs lg:text-sm font-['var(--font-dm-sans)'] text-[#8B4513] mb-1">
               Share this link to invite members:
             </p>
-            <code className="text-xs bg-white px-3 py-1.5 rounded border border-[#E8DDD0] text-[#1A1208] font-mono">
+            <code className="text-xs bg-white px-2 lg:px-3 py-1.5 rounded border border-[#E8DDD0] text-[#1A1208] font-mono block truncate">
               {`${window.location.origin}/join/${group.invite_token}`}
             </code>
           </div>
           <button
             onClick={copyInviteLink}
-            className="ml-4 px-4 py-2 bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors text-sm font-['var(--font-dm-sans)'] font-medium flex items-center gap-2"
+            className="w-full sm:w-auto sm:ml-4 px-4 py-2 bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors text-sm font-['var(--font-dm-sans)'] font-medium flex items-center justify-center gap-2"
           >
             {inviteLinkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             {inviteLinkCopied ? 'Copied!' : 'Copy'}
@@ -399,11 +410,11 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
       )}
 
       {/* Tabs */}
-      <div className="border-b border-border bg-white px-6">
-        <div className="flex gap-6">
+      <div className="border-b border-border bg-white px-3 lg:px-6">
+        <div className="flex gap-4 lg:gap-6 overflow-x-auto">
           <button
             onClick={() => setActiveTab('chat')}
-            className={`py-3 px-1 border-b-2 font-['var(--font-dm-sans)'] font-medium transition-colors ${
+            className={`py-2 lg:py-3 px-1 border-b-2 font-['var(--font-dm-sans)'] font-medium transition-colors text-sm lg:text-base whitespace-nowrap ${
               activeTab === 'chat'
                 ? 'border-[#8B4513] text-[#8B4513]'
                 : 'border-transparent text-[#6B5744] hover:text-[#8B4513]'
@@ -413,7 +424,7 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
           </button>
           <button
             onClick={() => setActiveTab('summary')}
-            className={`py-3 px-1 border-b-2 font-['var(--font-dm-sans)'] font-medium transition-colors ${
+            className={`py-2 lg:py-3 px-1 border-b-2 font-['var(--font-dm-sans)'] font-medium transition-colors text-sm lg:text-base whitespace-nowrap ${
               activeTab === 'summary'
                 ? 'border-[#8B4513] text-[#8B4513]'
                 : 'border-transparent text-[#6B5744] hover:text-[#8B4513]'
@@ -462,8 +473,8 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
             </div>
 
             {/* Input Area */}
-            <div className="border-t border-border px-6 py-4 bg-white">
-              <form onSubmit={handleSendMessage} className="flex gap-3">
+            <div className="border-t border-border px-3 lg:px-6 py-3 lg:py-4 bg-white">
+              <form onSubmit={handleSendMessage} className="flex flex-col sm:flex-row gap-2 lg:gap-3">
                 <textarea
                   ref={textareaRef}
                   value={messageInput}
@@ -475,14 +486,14 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
                     }
                   }}
                   placeholder="Type an expense naturally, e.g. 'I paid ₹500 for dinner with Neha'"
-                  className="flex-1 resize-none border border-[#E8DDD0] rounded-xl px-4 py-3 bg-white placeholder:text-[#A89880] text-[#1A1208] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#D4956A] max-h-24"
+                  className="flex-1 resize-none border border-[#E8DDD0] rounded-xl px-3 lg:px-4 py-2 lg:py-3 bg-white placeholder:text-[#A89880] text-[#1A1208] font-['var(--font-dm-sans)'] text-sm lg:text-base focus:outline-none focus:ring-2 focus:ring-[#D4956A] max-h-24"
                   rows={2}
                   disabled={isSending}
                 />
                 <button
                   type="submit"
                   disabled={isSending || !messageInput.trim()}
-                  className="px-6 py-3 bg-[#8B4513] text-white rounded-xl hover:bg-[#6B3410] transition-colors font-['var(--font-dm-sans)'] font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 lg:px-6 py-2 lg:py-3 bg-[#8B4513] text-white rounded-xl hover:bg-[#6B3410] transition-colors font-['var(--font-dm-sans)'] font-medium text-sm lg:text-base disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 >
                   {isSending ? 'Sending...' : 'Send'}
                 </button>
@@ -503,6 +514,18 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
           />
         )}
       </div>
+
+      {/* Manual Expense Modal */}
+      {showManualExpense && (
+        <ManualExpenseModal
+          onClose={() => setShowManualExpense(false)}
+          onExpenseAdded={fetchGroupData}
+          groupId={groupId}
+          members={members}
+          currentUser={currentUser}
+          group={group}
+        />
+      )}
     </div>
   );
 }

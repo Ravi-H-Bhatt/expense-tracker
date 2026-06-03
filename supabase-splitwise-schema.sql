@@ -66,29 +66,50 @@ ALTER TABLE group_expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expense_splits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE group_messages ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies
--- RLS Policies (Fixed - no circular references)
-CREATE POLICY "group_access" ON split_groups FOR ALL TO authenticated USING (
-  created_by = auth.uid() OR
+-- Drop existing policies first
+DROP POLICY IF EXISTS "group_access" ON split_groups;
+DROP POLICY IF EXISTS "member_access" ON group_members;
+DROP POLICY IF EXISTS "expense_access" ON group_expenses;
+DROP POLICY IF EXISTS "split_access" ON expense_splits;
+DROP POLICY IF EXISTS "message_access" ON group_messages;
+
+-- RLS Policies - Fixed with proper INSERT permissions
+CREATE POLICY "group_select" ON split_groups FOR SELECT TO authenticated USING (
+  created_by = auth.uid() OR 
   id IN (SELECT group_id FROM group_members WHERE user_id = auth.uid())
 );
 
-CREATE POLICY "member_access" ON group_members FOR ALL TO authenticated USING (
-  group_id IN (SELECT group_id FROM split_groups WHERE created_by = auth.uid() OR created_by IS NULL) OR
-  user_id = auth.uid()
+CREATE POLICY "group_insert" ON split_groups FOR INSERT TO authenticated WITH CHECK (
+  created_by = auth.uid()
 );
 
-CREATE POLICY "expense_access" ON group_expenses FOR ALL TO authenticated USING (
-  group_id IN (SELECT group_id FROM split_groups WHERE created_by = auth.uid()) OR
+CREATE POLICY "group_update" ON split_groups FOR UPDATE TO authenticated USING (
+  created_by = auth.uid()
+);
+
+CREATE POLICY "group_delete" ON split_groups FOR DELETE TO authenticated USING (
+  created_by = auth.uid()
+);
+
+CREATE POLICY "member_all" ON group_members FOR ALL TO authenticated USING (
+  user_id = auth.uid() OR
+  group_id IN (SELECT id FROM split_groups WHERE created_by = auth.uid())
+);
+
+CREATE POLICY "expense_all" ON group_expenses FOR ALL TO authenticated USING (
   group_id IN (SELECT group_id FROM group_members WHERE user_id = auth.uid())
 );
 
-CREATE POLICY "split_access" ON expense_splits FOR ALL TO authenticated USING (
-  TRUE
+CREATE POLICY "split_all" ON expense_splits FOR ALL TO authenticated USING (
+  user_id = auth.uid() OR
+  expense_id IN (
+    SELECT id FROM group_expenses WHERE group_id IN (
+      SELECT group_id FROM group_members WHERE user_id = auth.uid()
+    )
+  )
 );
 
-CREATE POLICY "message_access" ON group_messages FOR ALL TO authenticated USING (
-  group_id IN (SELECT group_id FROM split_groups WHERE created_by = auth.uid()) OR
+CREATE POLICY "message_all" ON group_messages FOR ALL TO authenticated USING (
   group_id IN (SELECT group_id FROM group_members WHERE user_id = auth.uid())
 );
 
