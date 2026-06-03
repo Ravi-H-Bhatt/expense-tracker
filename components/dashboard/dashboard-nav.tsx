@@ -11,6 +11,7 @@ import {
   PieChart, 
   Target, 
   Bot, 
+  Users,
   Settings, 
   LogOut,
   Sparkles,
@@ -32,6 +33,7 @@ const navigation = [
   { name: 'Analytics', href: '/dashboard/analytics', icon: PieChart },
   { name: 'Budgets', href: '/dashboard/budgets', icon: Target },
   { name: 'AI Assistant', href: '/dashboard/ai-assistant', icon: Bot },
+  { name: 'Splitwise', href: '/dashboard/splitwise', icon: Users },
 ];
 
 export default function DashboardNav({ user, profile }: DashboardNavProps) {

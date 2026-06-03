@@ -3,81 +3,51 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import { Sparkles, Mail, Lock, User, Phone, Loader2 } from 'lucide-react';
 
 export default function SignupPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    mobile: '',
-    password: '',
-    confirmPassword: '',
-  });
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const supabase = createClient();
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
-  };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (formData.password !== formData.confirmPassword) {
+    if (password !== confirmPassword) {
       toast.error('Passwords do not match');
       return;
     }
 
-    if (formData.password.length < 6) {
+    if (password.length < 6) {
       toast.error('Password must be at least 6 characters');
-      return;
-    }
-
-    if (!formData.mobile) {
-      toast.error('Mobile number is required');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
         options: {
           data: {
-            full_name: formData.fullName,
-            mobile_number: formData.mobile,
+            full_name: name,
           },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
       if (error) throw error;
 
-      // Check if email confirmation is disabled (auto-confirmed)
-      if (data.user && data.session) {
-        toast.success('Account created successfully!');
-        router.push('/dashboard');
-        router.refresh();
-      } else {
-        toast.success('Account created! Please check your email to verify.');
-        router.push('/auth/login');
-      }
+      toast.success('Check your email to confirm your account!');
+      router.push('/auth/login');
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create account');
+      toast.error(error.message || 'Failed to sign up');
     } finally {
       setIsLoading(false);
     }
@@ -86,7 +56,7 @@ export default function SignupPage() {
   const handleGoogleSignup = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
@@ -100,193 +70,232 @@ export default function SignupPage() {
     }
   };
 
-  const handleGithubSignup = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) throw error;
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to sign up with GitHub');
-      setIsLoading(false);
-    }
-  };
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-accent/20 p-4">
-      <Card className="w-full max-w-md glass-strong">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
-              <Sparkles className="w-7 h-7 text-primary-foreground" />
+    <div className="min-h-screen flex flex-col md:flex-row">
+      {/* Mobile gradient bar */}
+      <div className="h-2 w-full bg-gradient-to-r from-[#6B3410] via-[#8B4513] to-[#D4956A] md:hidden" />
+
+      {/* Left Panel - Brand Story */}
+      <div className="hidden md:flex md:w-[45%] min-h-screen relative overflow-hidden">
+        {/* Gradient Background */}
+        <div 
+          className="absolute inset-0" 
+          style={{
+            background: 'linear-gradient(145deg, #6B3410 0%, #8B4513 40%, #D4956A 100%)'
+          }}
+        />
+
+        {/* Noise texture overlay */}
+        <div 
+          className="absolute inset-0 opacity-[0.08]"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' /%3E%3C/svg%3E")`,
+            backgroundRepeat: 'repeat',
+            backgroundSize: '128px 128px'
+          }}
+        />
+
+        {/* Content */}
+        <div className="relative z-10 flex flex-col items-center justify-center px-12 text-white w-full">
+          {/* Logo & Wordmark */}
+          <div className="mb-8 text-center">
+            <svg width="56" height="56" viewBox="0 0 56 56" className="mx-auto mb-4" fill="white">
+              <path d="M28 4 L32 20 L48 20 L35 29 L40 45 L28 36 L16 45 L21 29 L8 20 L24 20 Z" />
+            </svg>
+            <h1 className="text-[2rem] font-['var(--font-playfair)'] font-semibold">RFin</h1>
+          </div>
+
+          {/* Tagline */}
+          <p className="text-lg italic text-white/80 mb-12 font-['var(--font-dm-sans)'] text-center max-w-md">
+            Your money, finally understood.
+          </p>
+
+          {/* Feature Pills */}
+          <div className="space-y-4 w-full max-w-sm">
+            <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm">
+              <span className="text-xl">✦</span>
+              <span className="font-['var(--font-dm-sans)'] text-base">Smart expense splitting</span>
+            </div>
+            <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm">
+              <span className="text-xl">✦</span>
+              <span className="font-['var(--font-dm-sans)'] text-base">AI finance assistant</span>
+            </div>
+            <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm">
+              <span className="text-xl">✦</span>
+              <span className="font-['var(--font-dm-sans)'] text-base">Group fund tracking</span>
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold">Create account</CardTitle>
-          <CardDescription>Start your financial journey with RFin</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSignup} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="fullName"
-                  name="fullName"
-                  type="text"
-                  placeholder="John Doe"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  className="pl-10"
-                  required
-                  disabled={isLoading}
-                />
-              </div>
+
+          {/* Decorative SVG at bottom */}
+          <div className="absolute bottom-12">
+            <svg width="200" height="60" viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="30" cy="30" r="25" stroke="white" strokeWidth="1" opacity="0.06" fill="white" fillOpacity="0.02" />
+              <circle cx="100" cy="30" r="28" stroke="white" strokeWidth="1" opacity="0.06" fill="white" fillOpacity="0.02" />
+              <circle cx="170" cy="30" r="25" stroke="white" strokeWidth="1" opacity="0.06" fill="white" fillOpacity="0.02" />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Panel - Form */}
+      <div className="flex-1 md:w-[55%] min-h-screen bg-[#FAF7F2] flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
+          {/* Mobile logo */}
+          <div className="md:hidden mb-8 text-center">
+            <svg width="48" height="48" viewBox="0 0 56 56" className="mx-auto mb-2" fill="#8B4513">
+              <path d="M28 4 L32 20 L48 20 L35 29 L40 45 L28 36 L16 45 L21 29 L8 20 L24 20 Z" />
+            </svg>
+            <h1 className="text-2xl font-['var(--font-playfair)'] font-semibold text-[#1A1208]">RFin</h1>
+          </div>
+
+          {/* Form Header */}
+          <div className="mb-8">
+            <h2 className="text-[2rem] font-['var(--font-playfair)'] font-semibold text-[#1A1208] mb-2">
+              Create your account
+            </h2>
+            <p className="text-[#6B5744] font-['var(--font-dm-sans)'] text-sm">
+              Start tracking smarter today
+            </p>
+          </div>
+
+          {/* Google OAuth Button */}
+          <button
+            onClick={handleGoogleSignup}
+            disabled={isLoading}
+            className="w-full bg-white border border-[#E8DDD0] rounded-xl py-3 px-4 flex items-center justify-center gap-3 font-['var(--font-dm-sans)'] font-medium text-[#1A1208] hover:bg-[#F9F6F1] hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24">
+              <path
+                fill="#4285F4"
+                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+              />
+            </svg>
+            Sign up with Google
+          </button>
+
+          {/* Divider */}
+          <div className="relative my-8">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-[#E8DDD0]" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="px-4 bg-[#FAF7F2] text-[#A89880] text-xs font-['var(--font-dm-sans)']">
+                or continue with email
+              </span>
+            </div>
+          </div>
+
+          {/* Signup Form */}
+          <form onSubmit={handleSignup} className="space-y-5">
+            {/* Full Name Field */}
+            <div>
+              <label htmlFor="name" className="block text-sm font-['var(--font-dm-sans)'] text-[#6B5744] mb-1">
+                Full Name
+              </label>
+              <input
+                id="name"
+                type="text"
+                placeholder="John Doe"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full border border-[#E8DDD0] rounded-xl px-4 py-3 bg-white placeholder:text-[#A89880] text-[#1A1208] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#D4956A]"
+                required
+                disabled={isLoading}
+              />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="pl-10"
-                  required
-                  disabled={isLoading}
-                />
-              </div>
+            {/* Email Field */}
+            <div>
+              <label htmlFor="email" className="block text-sm font-['var(--font-dm-sans)'] text-[#6B5744] mb-1">
+                Email Address
+              </label>
+              <input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full border border-[#E8DDD0] rounded-xl px-4 py-3 bg-white placeholder:text-[#A89880] text-[#1A1208] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#D4956A]"
+                required
+                disabled={isLoading}
+              />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="mobile">Mobile Number</Label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="mobile"
-                  name="mobile"
-                  type="tel"
-                  placeholder="+91 9876543210"
-                  value={formData.mobile}
-                  onChange={handleChange}
-                  className="pl-10"
-                  required
-                  disabled={isLoading}
-                />
-              </div>
+            {/* Password Field */}
+            <div>
+              <label htmlFor="password" className="block text-sm font-['var(--font-dm-sans)'] text-[#6B5744] mb-1">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full border border-[#E8DDD0] rounded-xl px-4 py-3 bg-white placeholder:text-[#A89880] text-[#1A1208] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#D4956A]"
+                required
+                disabled={isLoading}
+              />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={handleChange}
-                  className="pl-10"
-                  required
-                  disabled={isLoading}
-                />
-              </div>
+            {/* Confirm Password Field */}
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-['var(--font-dm-sans)'] text-[#6B5744] mb-1">
+                Confirm Password
+              </label>
+              <input
+                id="confirmPassword"
+                type="password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full border border-[#E8DDD0] rounded-xl px-4 py-3 bg-white placeholder:text-[#A89880] text-[#1A1208] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#D4956A]"
+                required
+                disabled={isLoading}
+              />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  placeholder="••••••••"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  className="pl-10"
-                  required
-                  disabled={isLoading}
-                />
-              </div>
-            </div>
-
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            {/* Create Account Button */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-[#8B4513] text-white rounded-xl py-3 px-4 font-['var(--font-dm-sans)'] font-medium hover:bg-[#6B3410] hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
                   Creating account...
-                </>
+                </span>
               ) : (
                 'Create Account'
               )}
-            </Button>
+            </button>
           </form>
 
-          <div className="relative my-6">
-            <Separator />
-            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
-              OR CONTINUE WITH
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Button
-              variant="outline"
-              onClick={handleGoogleSignup}
-              disabled={isLoading}
-            >
-              <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
-                <path
-                  fill="currentColor"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
-              </svg>
-              Google
-            </Button>
-
-            <Button
-              variant="outline"
-              onClick={handleGithubSignup}
-              disabled={isLoading}
-            >
-              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-              </svg>
-              GitHub
-            </Button>
-          </div>
-
-          <p className="text-center text-sm text-muted-foreground mt-6">
+          {/* Sign In Link */}
+          <p className="text-center text-sm font-['var(--font-dm-sans)'] text-[#6B5744] mt-6">
             Already have an account?{' '}
-            <Link href="/auth/login" className="text-primary hover:underline font-medium">
+            <Link href="/auth/login" className="text-[#8B4513] font-semibold hover:underline">
               Sign in
             </Link>
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
