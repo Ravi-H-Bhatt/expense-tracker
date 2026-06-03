@@ -14,7 +14,7 @@ export default function HomePage() {
             </div>
             <span className="text-2xl font-bold text-gradient">RFin</span>
           </div>
-          <Link href="/login">
+          <Link href="/auth/login">
             <Button variant="outline" size="lg">
               Sign In
             </Button>
@@ -51,7 +51,7 @@ export default function HomePage() {
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
             </Link>
-            <Link href="/login">
+            <Link href="/auth/login">
               <Button size="lg" variant="outline" className="text-lg px-8">
                 Sign In
               </Button>
