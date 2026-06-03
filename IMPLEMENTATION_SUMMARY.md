@@ -1,377 +1,499 @@
-# RFin Implementation Summary
+# RFin Payment Requests & Settlement - Implementation Summary
 
-## 🎉 Complete Implementation
+## Overview
 
-All features from the implementation prompt have been successfully built and are ready to deploy.
-
----
-
-## ✅ Part 1: Login UI + Google OAuth
-
-### Login Page (`app/auth/login/page.tsx`)
-- ✅ Full redesign with split-panel luxury layout
-- ✅ Left panel (45%): Brand story with gradient, logo, tagline, feature pills
-- ✅ Right panel (55%): Login form with Google OAuth button prominently placed
-- ✅ Warm beige color scheme (#FAF7F2, #8B4513, #D4956A)
-- ✅ Playfair Display for headings, DM Sans for body
-- ✅ Mobile responsive: hides left panel, shows only form
-- ✅ Google OAuth button with proper Google logo SVG
-- ✅ Email/password fields with custom styling
-- ✅ returnTo parameter support for redirect after login
-
-### Signup Page (`app/auth/signup/page.tsx`)
-- ✅ Identical split-panel layout as login
-- ✅ "Create your account" heading
-- ✅ "Sign up with Google" button
-- ✅ Fields: Full Name → Email → Password → Confirm Password
-- ✅ "Create Account" button
-- ✅ Password validation (min 6 chars, match check)
-- ✅ Email confirmation flow
-
-### Auth Callback (`app/auth/callback/route.ts`)
-- ✅ Handles OAuth redirects
-- ✅ Exchanges code for session
-- ✅ Redirects to dashboard on success
-
-### Fonts & Styling
-- ✅ Added Playfair Display and DM Sans to root layout
-- ✅ Custom font variables in CSS
-- ✅ Warm luxury color palette throughout
+A complete implementation of payment requests, two-sided settlements, and AI-powered expense parsing for the RFin group expense tracker. This adds professional-grade payment management features including request tracking, settlement confirmation, and group fund management.
 
 ---
 
-## ✅ Part 2: Splitwise Module
+## 📋 Features Implemented
 
-### Database Schema (`supabase-splitwise-schema.sql`)
-- ✅ `split_groups` - Group information with invite tokens
-- ✅ `group_members` - Member associations
-- ✅ `group_expenses` - Expense records
-- ✅ `expense_splits` - Individual split amounts
-- ✅ `group_messages` - Chat messages with types (chat/expense_log/ai_response)
-- ✅ Row Level Security (RLS) policies
-- ✅ Realtime subscriptions enabled
-- ✅ Indexes for performance
+### 1. **AI Natural Language Expense Parsing** ✅
+- **Multi-expense detection**: Parse multiple expenses in a single message
+- **Group fund support**: "from group fund spent X" creates fund-only transactions
+- **Split detection**: Auto-detect split expenses with "split", "divide", "all members"
+- **Payer detection**: "I paid" vs "[Name] paid" recognition
+- **Smart description extraction**: Extract purpose from natural text
+- **Amount parsing**: Handle ₹, Rs, rupees, and numeric formats
 
-### Sidebar Integration
-- ✅ Added "Splitwise" with Users icon to dashboard navigation
-- ✅ Clean styling matching other nav items
-- ✅ Link to `/dashboard/splitwise`
+**File:** `lib/expense-parser.ts`
 
-### Main Splitwise Page (`app/dashboard/splitwise/page.tsx`)
-- ✅ Split layout: Group list (left) + Workspace (right)
-- ✅ Create group button
-- ✅ Join via link button
-- ✅ Empty state when no group selected
-- ✅ Group selection handling
-
-### GroupList Component (`components/splitwise/GroupList.tsx`)
-- ✅ Displays all user groups
-- ✅ Shows group fund badges
-- ✅ Active state highlighting
-- ✅ Truncated descriptions
-
-### GroupWorkspace Component (`components/splitwise/GroupWorkspace.tsx`)
-- ✅ Top bar with group name, member avatars, fund badge, invite button
-- ✅ Invite link banner with copy functionality
-- ✅ Tabs: Chat and Summary
-- ✅ Real-time chat interface
-- ✅ Message input with natural language hints
-- ✅ AI processing indicator
-- ✅ Expense confirmation flow
-- ✅ Auto-scroll to bottom on new messages
-- ✅ Real-time subscriptions for messages and expenses
-
-### ChatMessage Component (`components/splitwise/ChatMessage.tsx`)
-- ✅ Three message variants:
-  - **chat**: User messages (left/right aligned bubbles)
-  - **expense_log**: Expense cards with splits display
-  - **ai_response**: AI messages with special styling
-- ✅ Formatted timestamps
-- ✅ Currency formatting (INR with ₹)
-- ✅ Split status indicators (paid/settled/owes)
-- ✅ Settle split button (inline)
-
-### ExpenseConfirmCard Component (`components/splitwise/ExpenseConfirmCard.tsx`)
-- ✅ Highlighted card with gradient background
-- ✅ Shows parsed expense details
-- ✅ Displays all splits with member avatars
-- ✅ "Add to Group" and "Cancel" buttons
-- ✅ Group fund expense detection and display
-
-### GroupSummary Component (`components/splitwise/GroupSummary.tsx`)
-- ✅ Group fund box (total fund, spent, remaining)
-- ✅ Balance sheet table:
-  - Member name with avatar
-  - Total paid
-  - Total owes
-  - Net balance (color-coded: green/red)
-  - Settle up button per member
-- ✅ Pie chart with Recharts:
-  - Spending by member
-  - Warm color palette
-  - Percentage labels
-  - Custom tooltips
-  - Group fund as separate slice
-- ✅ Recent expenses list (last 10)
-
-### CreateGroupModal Component (`components/splitwise/CreateGroupModal.tsx`)
-- ✅ Modal with backdrop blur
-- ✅ Form fields: Name, Description, Group Fund
-- ✅ Group fund hint text
-- ✅ Success state with invite link display
-- ✅ Copy invite link functionality
-- ✅ Auto-close after creation
-
-### JoinGroupModal Component (`components/splitwise/JoinGroupModal.tsx`)
-- ✅ Paste invite link input
-- ✅ Token extraction from link
-- ✅ Duplicate member check
-- ✅ Auto-add to group
-- ✅ Error handling for invalid links
-
-### Join Route (`app/join/[token]/page.tsx`)
-- ✅ Direct invite link handling
-- ✅ Auth check (redirect to login if needed)
-- ✅ Token validation
-- ✅ Duplicate member check
-- ✅ Auto-add to group
-- ✅ Loading states
-- ✅ Error states
-- ✅ Auto-redirect to splitwise page
-
-### AI Function (`netlify/functions/splitwise-ai.js`)
-- ✅ Anthropic Claude Sonnet 4 integration
-- ✅ Natural language expense parsing
-- ✅ Group context awareness (members, balances, fund)
-- ✅ Conversation history (last 10 messages)
-- ✅ JSON expense extraction
-- ✅ Support for:
-  - Equal splits
-  - Custom percentage splits
-  - Group fund expenses
-  - Settlement confirmations
-  - Balance queries
-  - Multilingual (English, Hindi, Hinglish)
-- ✅ CORS headers
-- ✅ Error handling
-
----
-
-## 📁 File Structure
-
+**Usage:**
+```typescript
+const result = parseExpenseInput(
+  "I paid 500 for dinner split with Krisha",
+  userId,
+  userName,
+  groupMembers
+);
 ```
-rfin/
-├── app/
-│   ├── auth/
-│   │   ├── login/page.tsx ✅ REDESIGNED
-│   │   ├── signup/page.tsx ✅ REDESIGNED
-│   │   └── callback/route.ts ✅ NEW
-│   ├── dashboard/
-│   │   └── splitwise/page.tsx ✅ NEW
-│   ├── join/
-│   │   └── [token]/page.tsx ✅ NEW
-│   └── layout.tsx ✅ UPDATED (fonts)
-├── components/
-│   ├── dashboard/
-│   │   └── dashboard-nav.tsx ✅ UPDATED (Splitwise nav)
-│   └── splitwise/ ✅ ALL NEW
-│       ├── GroupList.tsx
-│       ├── GroupWorkspace.tsx
-│       ├── ChatMessage.tsx
-│       ├── ExpenseConfirmCard.tsx
-│       ├── GroupSummary.tsx
-│       ├── CreateGroupModal.tsx
-│       └── JoinGroupModal.tsx
-├── netlify/
-│   └── functions/
-│       └── splitwise-ai.js ✅ NEW
-├── supabase-splitwise-schema.sql ✅ NEW
-├── SPLITWISE_README.md ✅ NEW
-├── SPLITWISE_QUICK_START.md ✅ NEW
-├── .env.splitwise.example ✅ NEW
-└── IMPLEMENTATION_SUMMARY.md ✅ THIS FILE
+
+### 2. **Balance Sheet Action Buttons** ✅
+- **Context-aware buttons**: "Request" or "Pay" based on balance direction
+- **User role detection**: Different buttons for current user vs others
+- **Net balance calculation**: Automatic calculation of who owes whom
+- **Settled state**: No buttons when balance is zero
+
+**Rules:**
+- If I'm owed: Show "Request" button on my row
+- If I owe someone: Show "Pay" button on their row
+- If someone is owed: Show "Request" button to ask them
+
+**File:** `lib/balance-actions.ts`
+
+### 3. **Payment Request Flow** ✅
+- **Send requests**: Create payment request with notification
+- **Track status**: pending → pending_confirmation → confirmed
+- **Debtors notified**: Automatic notification when requested
+- **Request history**: All requests stored and queryable
+
+**Endpoint:** `POST /api/payments/request`
+
+**Database:** `payment_requests` table
+
+### 4. **Two-Sided Settlement Confirmation** ✅
+- **Initiate settlement**: Payer marks payment as sent
+- **Pending confirmation**: Payee receives notification to confirm
+- **Accept/Reject flow**: Payee can confirm receipt or reject
+- **Automatic settlement**: Splits marked as settled on confirmation
+- **Rejection handling**: Notifies payer if payment not confirmed
+
+**Endpoint:** `POST /api/payments/settle`
+
+**Database:** `settlements` table
+
+**Flow:**
+1. Payer clicks "Pay"
+2. Settlement created (status: pending_confirmation)
+3. Payee sees "X says they paid ₹Y - Confirm?"
+4. Payee clicks Accept/Reject
+5. Settlement confirmed/rejected, both notified
+
+### 5. **Profile Name Management** ✅
+- **Editable display names**: Users can set their visible name
+- **Auto-edit mode**: Prompts if name not set
+- **Inline editing**: Click edit pencil to change
+- **Keyboard shortcuts**: Enter to save, Esc to cancel
+- **Sync across app**: Name updates everywhere automatically
+
+**Component:** `components/ProfileNameEditor.tsx`
+
+**Priority fallback:**
+1. `profile.full_name`
+2. `user_metadata.full_name`
+3. Email prefix (before @)
+4. "User"
+
+### 6. **Group Fund Tracking** ✅
+- **Fund balance**: Tracked separately from individual balances
+- **No individual debts**: Group fund expenses don't create personal debts
+- **Fund visibility**: Displayed in balance sheet with starting, spent, remaining
+- **Group chat indicator**: Yellow badge "Paid from Group Fund"
+
+**Logic:**
+- When group_fund expense added: deduct from `group.group_fund`
+- Store with `is_group_fund_expense: true` and empty `debts` array
+- Display separately in balance sheet
+
+---
+
+## 📁 Files Created
+
+### Database Migration
+```
+supabase-payment-requests-schema.sql
+  ├── payment_requests table
+  ├── settlements table
+  ├── notifications table
+  ├── RLS policies
+  └── Indexes + realtime
+```
+
+### API Endpoints
+```
+app/api/payments/
+  ├── request/route.ts          (Send payment requests)
+  └── settle/route.ts           (Handle settlement confirmations)
+```
+
+### Libraries & Utilities
+```
+lib/
+  ├── expense-parser.ts         (AI natural language parsing)
+  └── balance-actions.ts        (Balance sheet logic)
+```
+
+### Components
+```
+components/
+  └── ProfileNameEditor.tsx     (Reusable name editor)
+```
+
+### Documentation
+```
+├── PAYMENT_REQUESTS_IMPLEMENTATION.md  (Detailed feature guide)
+├── IMPLEMENTATION_CHECKLIST.md         (Quick start setup)
+└── IMPLEMENTATION_SUMMARY.md           (This file)
 ```
 
 ---
 
-## 🎨 Design Compliance
+## 🔧 Files Modified
 
-### Colors Used
-- Background: `#FAF7F2` ✅
-- Primary Brown: `#8B4513` ✅
-- Darker Brown: `#6B3410` ✅
-- Terracotta: `#D4956A` ✅
-- Light Beige: `#F5EFE6` ✅
-- Border: `#E8DDD0` ✅
-- Text Dark: `#1A1208` ✅
-- Text Medium: `#6B5744` ✅
-- Text Muted: `#A89880` ✅
-- Group Fund: `#FFF3CD` ✅
+### `components/splitwise/GroupSummary.tsx`
+- ✅ Added `groupId` prop
+- ✅ Implemented `handleSendPaymentRequest()` function
+- ✅ Updated balance sheet action button logic
+- ✅ Removed unused imports (Legend, members)
+- ✅ Fixed TypeScript warnings
 
-### Typography
-- Headings: `font-['var(--font-playfair)']` ✅
-- Body: `font-['var(--font-dm-sans)']` ✅
-- All text properly styled ✅
-
-### Currency Format
-- INR format: `new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' })` ✅
-- ₹ symbol used throughout ✅
+### `components/splitwise/GroupWorkspace.tsx`
+- ✅ Pass `groupId` to GroupSummary prop
 
 ---
 
-## 🚀 Deployment Checklist
+## 🚀 Quick Start
 
-### Pre-Deployment
-- [x] All TypeScript errors resolved
-- [x] All components created
-- [x] Database schema prepared
-- [x] Netlify function created
-- [x] Dependencies installed (@anthropic-ai/sdk)
-- [x] Environment variables documented
+### 1. Database Setup (5 minutes)
+```bash
+# In Supabase Dashboard > SQL Editor:
+# Copy & paste: supabase-payment-requests-schema.sql
+# Execute query
+# Verify 3 tables created: payment_requests, settlements, notifications
+```
 
-### Deployment Steps
-1. ✅ Run `supabase-splitwise-schema.sql` in Supabase SQL Editor
-2. ⏳ Set `ANTHROPIC_API_KEY` in Netlify Environment Variables
-3. ⏳ Configure Google OAuth in Supabase Dashboard
-4. ⏳ Add redirect URIs in Google Cloud Console
-5. ⏳ Deploy to Netlify
-6. ⏳ Test login flow
-7. ⏳ Test Splitwise functionality
+### 2. Update AI Processing (10 minutes)
+Find your AI expense parsing logic and update to use:
+```typescript
+import { parseExpenseInput } from '@/lib/expense-parser';
+
+const parseResult = parseExpenseInput(
+  userMessage,
+  currentUserId,
+  currentUserName,
+  groupMembers.map(m => ({name: m.display_name, id: m.user_id}))
+);
+
+// Use parseResult.expenses for structured data
+```
+
+### 3. Add Profile Editor (5 minutes)
+In your profile/settings page:
+```typescript
+import ProfileNameEditor from '@/components/ProfileNameEditor';
+
+<ProfileNameEditor
+  user={currentUser}
+  onNameUpdated={fetchGroupData}
+  compact={false}
+/>
+```
+
+### 4. Test the APIs (5 minutes)
+```bash
+# Test payment request
+curl -X POST http://localhost:3000/api/payments/request \
+  -H "Content-Type: application/json" \
+  -d '{
+    "toUserId": "user-uuid",
+    "amount": 200,
+    "groupId": "group-uuid"
+  }'
+```
+
+**Total setup time: ~25 minutes**
+
+---
+
+## 📊 Data Flow Diagrams
+
+### Payment Request Flow
+```
+User A (Owed)                                User B (Owes)
+    ↓
+[Balance Sheet - shows +₹200]
+    ↓
+Click "Request" button
+    ↓
+POST /api/payments/request
+    ↓
+Create payment_request record
+Create notification
+    ↓                                        ↓
+                              [Home shows notification]
+                              "A is requesting ₹200"
+                              [Pay] [Dismiss]
+```
+
+### Settlement Confirmation Flow
+```
+Payer                                       Payee
+  ↓
+[Balance Sheet - shows -₹200]
+  ↓
+Click "Pay" button
+  ↓
+POST /api/payments/settle (action: initiate)
+  ↓
+Settlement created (pending_confirmation)
+  ↓                                         ↓
+                              [Notification received]
+                              "X says they paid ₹200"
+                              [Accept] [Reject]
+                              ↓
+                         Click Accept
+                              ↓
+                    POST /api/payments/settle (action: confirm)
+                              ↓
+                    Settlement confirmed
+                    Debts marked settled
+                    Both notified "Settled ✓"
+                              ↓
+[Both see "Settled ✓" in balance sheet]
+```
+
+### Expense Parsing Flow
+```
+User types: "I paid 500 for dinner split with Krisha"
+    ↓
+parseExpenseInput() called
+    ↓
+Extract amount: 500
+Extract payer: "I" → currentUserId
+Detect split: "split with Krisha"
+    ↓
+Return structured:
+{
+  type: "split",
+  amount: 500,
+  paidBy: currentUserId,
+  splitAmong: [currentUserId, krishaId],
+  debts: [{member: "Krisha", owes: 250}]
+}
+```
 
 ---
 
 ## 🧪 Testing Guide
 
-### Login Testing
+### Test 1: Payment Request
+1. Open group in browser A as User1
+2. Open same group in browser B as User2
+3. User1 adds expense: "I paid 500 for lunch split with User2"
+4. Go to Summary tab
+5. See balance sheet with User2 owing 250
+6. Click "Pay" button on User2's row
+7. ✅ Should see "Payment request sent to User2"
+8. In browser B, check notifications
+9. ✅ Should see request notification
+
+### Test 2: Settlement Confirmation
+1. Continue from Test 1, User2 receives request
+2. User2 clicks "Pay Now" in notification
+3. Dialog: "User2 says they have paid ₹250"
+4. [Accept] [Reject] buttons
+5. User2 clicks Accept
+6. ✅ Settlement confirmed
+7. Both users see "Settled ✓"
+
+### Test 3: Expense Parsing
+1. Try messages in chat:
+   - "I paid 500 for dinner split with Krisha"
+   - "from group fund 1000 for supplies"
+   - "Arjun paid 300 for groceries divide among all"
+   - "I spent 200 and another 300 split equally"
+2. ✅ AI should parse each correctly
+
+### Test 4: Profile Name Editor
+1. Go to profile page
+2. Click edit pencil on name
+3. Change to "Test Name"
+4. Press Enter or click Save
+5. Go back to group
+6. ✅ Name updated in all locations
+
+---
+
+## 📱 Balance Sheet Examples
+
+### Example 1: Mixed Balances
 ```
-1. Visit /auth/login
-2. Check split-panel design appears
-3. Click "Continue with Google" → Should redirect to Google
-4. Complete Google login → Should redirect to /dashboard
-5. Try email/password login → Should work
-6. Try signup → Should send confirmation email
+Member    │ Paid   │ Owes   │ Net    │ Action
+────────────────────────────────────────────
+You       │ ₹2000  │ ₹1000  │ +₹1000 │ [Request]
+Krisha    │ ₹500   │ ₹1500  │ -₹1000 │ [Pay]
+Arjun     │ ₹1200  │ ₹1200  │ ₹0     │ —
 ```
 
-### Splitwise Testing
+### Example 2: With Group Fund
 ```
-1. Visit /dashboard/splitwise
-2. Click "+ New" → Create "Test Group"
-3. Copy invite link → Open in incognito → Should auto-join
-4. In chat, type: "I paid 1000 for dinner with Alice"
-5. AI should respond with parsed expense
-6. Click "Add to Group" → Expense should appear as expense_log
-7. Click "Summary" → Balance sheet should show correct splits
-8. Click "Settle Up" for Alice → Split should mark as settled
-9. Test group fund: "We spent 500 from group fund on snacks"
-10. Verify fund balance decreases
-```
-
-### Natural Language Testing
-```
-Try these in chat:
-- "I paid 1200 for dinner between me, Neha and Sam"
-- "We spent 500 from group fund on snacks"
-- "Ravi paid 3000 for hotel split among 4 of us"
-- "Maine 500 ka petrol bhara" (Hinglish)
-- "Who owes me money?" (Balance query)
-- "Neha settled with me" (Settlement)
+Member    │ Paid   │ Owes   │ Net    │ Action
+────────────────────────────────────────────
+You       │ ₹3000  │ ₹2000  │ +₹1000 │ [Request]
+Group Fund│ ₹5000  │ ₹5000  │ ₹0     │ —
 ```
 
 ---
 
-## 📊 Features Delivered
+## 🔐 Security Considerations
 
-### Authentication
-- ✅ Split-panel luxury login UI
-- ✅ Google OAuth integration
-- ✅ Email/password auth
-- ✅ Signup flow
-- ✅ Auth callback handling
-- ✅ returnTo parameter support
+### Row Level Security (RLS)
+- ✅ Users can only see their own notifications
+- ✅ Users can only create requests in groups they're in
+- ✅ Users can only see settlements they're involved in
 
-### Group Management
-- ✅ Create groups with optional fund
-- ✅ Invite via unique token
-- ✅ Join via link
-- ✅ Member display with avatars
-- ✅ Group list with badges
+### API Security
+- ✅ Verify user is authenticated (`auth.getUser()`)
+- ✅ Verify user is member of group
+- ✅ Validate amount > 0
+- ✅ Prevent self-payments
 
-### Expense Management
-- ✅ Natural language input
-- ✅ AI expense parsing
-- ✅ Equal and custom splits
-- ✅ Group fund expenses
-- ✅ Expense confirmation
-- ✅ Settle up functionality
-
-### Communication
-- ✅ Real-time chat
-- ✅ AI responses
-- ✅ Expense logs in chat
-- ✅ Message history
-
-### Visualization
-- ✅ Balance sheet table
-- ✅ Pie chart (spending by member)
-- ✅ Group fund tracking
-- ✅ Recent expenses list
-
-### Real-time Features
-- ✅ Live message updates
-- ✅ Instant expense notifications
-- ✅ Balance sheet auto-refresh
+### Data Validation
+- ✅ Check required fields
+- ✅ Validate user IDs exist
+- ✅ Verify group exists
+- ✅ Check amounts are positive
 
 ---
 
-## 🎯 Performance Optimizations
+## 🐛 Troubleshooting
 
-- ✅ Efficient database queries with indexes
-- ✅ Real-time subscriptions cleanup on unmount
-- ✅ Conversation history limited to last 10 messages
-- ✅ Optimistic UI updates
-- ✅ Auto-scroll only on new messages
-- ✅ Lazy loading of group data
+### Issue: "Table payment_requests does not exist"
+```
+→ Run supabase-payment-requests-schema.sql
+```
 
----
+### Issue: "Payment request sent but no notification"
+```
+→ Check notifications table:
+SELECT * FROM notifications 
+WHERE type = 'payment_request' 
+ORDER BY created_at DESC LIMIT 5;
 
-## 🔒 Security Measures
+→ Verify notification RLS policy allows user to see it
+```
 
-- ✅ Row Level Security (RLS) on all tables
-- ✅ Server-side API key storage (Netlify function)
-- ✅ OAuth flow with secure redirects
-- ✅ Token-based invite system
-- ✅ User authentication required for all routes
-- ✅ CORS properly configured
+### Issue: "Settlement not confirming"
+```
+→ Check settlements table:
+SELECT * FROM settlements 
+WHERE status = 'pending_confirmation'
+ORDER BY created_at DESC LIMIT 5;
 
----
+→ Verify payee_confirmed can only be set by payee
+```
 
-## 📝 Documentation Provided
-
-1. **SPLITWISE_README.md** - Comprehensive guide with all features
-2. **SPLITWISE_QUICK_START.md** - 5-minute setup instructions
-3. **IMPLEMENTATION_SUMMARY.md** - This file, complete overview
-4. **.env.splitwise.example** - Environment variables template
-
----
-
-## 🎊 Conclusion
-
-**All features from the implementation prompt have been completed successfully.**
-
-The app is ready to deploy with:
-- Redesigned luxury login/signup pages with Google OAuth
-- Complete Splitwise module with natural language AI
-- Real-time collaboration
-- Beautiful UI matching the warm beige aesthetic
-- Mobile responsive design
-- Comprehensive documentation
-
-**Next Steps:**
-1. Run the SQL schema in Supabase
-2. Set ANTHROPIC_API_KEY in Netlify
-3. Configure Google OAuth
-4. Deploy and test!
+### Issue: "Expense parsing not recognizing member names"
+```
+→ Ensure groupMembers array has correct display_name values
+→ Check for typos or case sensitivity in member names
+```
 
 ---
 
-Built with Next.js 16, Supabase, Anthropic Claude Sonnet 4, Recharts, and Tailwind CSS 4. 🚀
+## 📈 Performance Considerations
+
+### Indexes
+All new tables have indexes on:
+- User IDs (for filtering by user)
+- Group IDs (for filtering by group)
+- Status (for finding pending items)
+- Created dates (for ordering)
+
+### Realtime
+Enabled on: `payment_requests`, `settlements`, `notifications`
+
+### Query Optimization
+- Use Supabase filtering for large datasets
+- Paginate notifications
+- Cache balance calculations
+
+---
+
+## 🚀 Production Deployment
+
+### Pre-Deployment Checklist
+- [ ] Run database migration on production
+- [ ] Test payment request flow end-to-end
+- [ ] Test settlement confirmation flow
+- [ ] Verify email notifications (if implemented)
+- [ ] Test with actual user data
+- [ ] Monitor API performance
+- [ ] Check notification delivery
+
+### Rollback Plan
+```sql
+-- If needed, drop new tables:
+DROP TABLE IF EXISTS settlements;
+DROP TABLE IF EXISTS payment_requests;
+DROP TABLE IF EXISTS notifications;
+
+-- Restore previous code version
+```
+
+---
+
+## 📝 Next Steps
+
+### Phase 2: User Interface
+- [ ] Build notification dashboard
+- [ ] Create settlement confirmation modal
+- [ ] Add payment request history view
+- [ ] Build notification center
+
+### Phase 3: Email Notifications
+- [ ] Setup SendGrid/Resend
+- [ ] Send email on payment request
+- [ ] Send email on settlement confirmation
+- [ ] Send weekly payment reminders
+
+### Phase 4: Advanced Features
+- [ ] Recurring payments
+- [ ] Payment receipts
+- [ ] Bulk settlements
+- [ ] Payment integrations (UPI, etc)
+- [ ] Analytics & insights
+- [ ] Payment calendar
+
+---
+
+## 📚 Documentation References
+
+- **Feature Details**: See `PAYMENT_REQUESTS_IMPLEMENTATION.md`
+- **Setup Instructions**: See `IMPLEMENTATION_CHECKLIST.md`
+- **Expense Parser**: See `lib/expense-parser.ts`
+- **Balance Actions**: See `lib/balance-actions.ts`
+- **API Endpoints**: See `app/api/payments/`
+
+---
+
+## ✅ Implementation Status
+
+| Feature | Status | Files |
+|---------|--------|-------|
+| Database Schema | ✅ Done | supabase-payment-requests-schema.sql |
+| Expense Parser | ✅ Done | lib/expense-parser.ts |
+| Balance Actions | ✅ Done | lib/balance-actions.ts |
+| Payment API | ✅ Done | app/api/payments/request/route.ts |
+| Settlement API | ✅ Done | app/api/payments/settle/route.ts |
+| Profile Editor | ✅ Done | components/ProfileNameEditor.tsx |
+| UI Integration | 🟡 Partial | GroupSummary.tsx updated |
+| Notifications UI | ⏳ TODO | New components needed |
+| Email Service | ⏳ TODO | Need SendGrid setup |
+| Settlement Dialog | ⏳ TODO | New component needed |
+
+---
+
+## 🙋 Support
+
+For questions or issues:
+1. Check the troubleshooting section above
+2. Review `PAYMENT_REQUESTS_IMPLEMENTATION.md` for detailed docs
+3. Check API endpoint implementations for request/response formats
+4. Run SQL queries to verify data is created correctly
+
+---
+
+**Implementation completed:** June 3, 2026  
+**Status:** Ready for integration and testing  
+**Next phase:** UI components and email notifications

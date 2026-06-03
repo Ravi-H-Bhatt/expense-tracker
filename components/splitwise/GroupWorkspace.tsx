@@ -862,6 +862,7 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
             onUpdate={fetchGroupData}
             onDeleteExpense={handleDeleteExpense}
             balances={state.balances}
+            groupId={groupId}
           />
         )}
       </div>

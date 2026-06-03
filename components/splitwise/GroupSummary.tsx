@@ -1,6 +1,6 @@
 'use client';
 
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { Trash2 } from 'lucide-react';
@@ -14,6 +14,7 @@ interface GroupSummaryProps {
   onUpdate: () => void;
   onDeleteExpense?: (expenseId: string) => void;
   balances: Record<string, { paid: number; owes: number; net: number; userId: string }>;
+  groupId?: string;
 }
 
 export default function GroupSummary({ 
@@ -24,7 +25,8 @@ export default function GroupSummary({
   currentUser,
   onUpdate,
   onDeleteExpense,
-  balances
+  balances,
+  groupId
 }: GroupSummaryProps) {
   const supabase = createClient();
 
@@ -34,6 +36,56 @@ export default function GroupSummary({
       currency: 'INR',
       maximumFractionDigits: 0 
     }).format(amount);
+  };
+
+  const handleSendPaymentRequest = async (memberName: string, amount: number) => {
+    try {
+      if (!groupId || !currentUser?.id) {
+        toast.error('Cannot send request - missing data');
+        return;
+      }
+
+      const debtor = members.find(m => m.display_name === memberName);
+      if (!debtor) {
+        toast.error('Member not found');
+        return;
+      }
+
+      // Create payment request record
+      const { error } = await supabase
+        .from('payment_requests')
+        .insert({
+          from_user_id: currentUser.id,
+          to_user_id: debtor.user_id,
+          amount: amount,
+          group_id: groupId,
+          status: 'pending',
+          created_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+
+      // Create notification for the debtor
+      const requesterName = currentUser.profile?.full_name || currentUser.email?.split('@')[0] || 'Someone';
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: debtor.user_id,
+          type: 'payment_request',
+          title: `Payment request from ${requesterName}`,
+          message: `${requesterName} is requesting ${formatCurrency(amount)} in ${group.name}`,
+          group_id: groupId,
+          from_user_id: currentUser.id,
+          amount: amount,
+          status: 'unread'
+        });
+
+      toast.success(`Payment request sent to ${memberName}!`);
+      onUpdate();
+    } catch (error) {
+      toast.error('Failed to send payment request');
+      console.error(error);
+    }
   };
 
   const handleSettleUp = async (memberName: string) => {
@@ -196,17 +248,21 @@ export default function GroupSummary({
                       </span>
                     </td>
                     <td className="text-right py-2 lg:py-3 px-1 lg:px-2">
-                      {data.net > 0 && (
+                      {data.net > 0 && data.id === currentUser?.id ? null : null}
+                      {data.net > 0 && data.userId !== currentUser?.id && (
                         <button
+                          onClick={() => handleSendPaymentRequest(name, data.net)}
                           className="px-2 lg:px-3 py-1 lg:py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium whitespace-nowrap"
+                          title={`Request ₹${data.net.toLocaleString('en-IN')} from ${name}`}
                         >
                           Request
                         </button>
                       )}
-                      {data.net < 0 && (
+                      {data.net < 0 && data.userId === currentUser?.id && (
                         <button
                           onClick={() => handleSettleUp(name)}
                           className="px-2 lg:px-3 py-1 lg:py-1.5 text-xs bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors font-medium whitespace-nowrap"
+                          title={`Pay ₹${Math.abs(data.net).toLocaleString('en-IN')} to settle`}
                         >
                           Pay
                         </button>
@@ -249,7 +305,7 @@ export default function GroupSummary({
                 fill="#8884d8"
                 dataKey="value"
               >
-                {chartData.map((entry, index) => (
+                {chartData.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
