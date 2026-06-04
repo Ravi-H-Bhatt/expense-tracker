@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Bot, Send, Loader2, Sparkles } from 'lucide-react';
+import { Bot, Send, Loader2, Sparkles, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -112,6 +112,30 @@ export default function AIAssistantPage() {
     }
   };
 
+  const handleClearChat = async () => {
+    if (!confirm('Are you sure you want to delete all chat history? This cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('chat_history')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setMessages([]);
+      toast.success('Chat history cleared!');
+    } catch (error) {
+      console.error('Error clearing chat history:', error);
+      toast.error('Failed to clear chat history');
+    }
+  };
+
   const exampleQueries = [
     "Spent ₹500 on petrol",
     "How much did I spend on food this month?",
@@ -128,7 +152,18 @@ export default function AIAssistantPage() {
             <Bot className="w-9 h-9 text-primary-foreground" />
           </div>
         </div>
-        <h1 className="text-3xl md:text-4xl font-bold mb-2">AI Financial Assistant</h1>
+        <div className="flex items-center justify-center gap-4 mb-2">
+          <h1 className="text-3xl md:text-4xl font-bold">AI Financial Assistant</h1>
+          {messages.length > 0 && (
+            <button
+              onClick={handleClearChat}
+              className="p-2 hover:bg-red-50 rounded-lg transition-colors group"
+              title="Clear chat history"
+            >
+              <Trash2 className="w-5 h-5 text-muted-foreground group-hover:text-red-600" />
+            </button>
+          )}
+        </div>
         <p className="text-muted-foreground">
           Your intelligent finance copilot. Add expenses, check budgets, and get insights naturally.
         </p>

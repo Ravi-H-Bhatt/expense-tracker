@@ -68,11 +68,25 @@ export default function ProfileNameEditor({
           // PGRST116 is "no rows found" - acceptable if profiles table doesn't exist or this user isn't in it
           console.warn('Profile update warning:', profileError);
         }
+
+        // Sync display name to all group_members records for this user
+        console.log('🔄 Syncing display name to all groups...');
+        const { error: memberError } = await supabase
+          .from('group_members')
+          .update({ display_name: name.trim() })
+          .eq('user_id', user.id);
+
+        if (memberError) {
+          console.error('Error syncing display name to groups:', memberError);
+          toast.error('Name updated but failed to sync to groups. Refresh the page.');
+        } else {
+          console.log('✅ Display name synced to all groups');
+        }
       }
 
       setOriginalName(name.trim());
       setEditing(false);
-      toast.success('Name updated successfully');
+      toast.success('Name updated successfully across all groups');
       onNameUpdated?.(name.trim());
     } catch (error) {
       console.error('Error saving name:', error);

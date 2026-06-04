@@ -169,12 +169,12 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
   useEffect(() => {
     if (groupId && currentUser) {
       fetchGroupData();
-      subscribeToRealtime();
+      const cleanup = subscribeToRealtime();
+      
+      return () => {
+        if (cleanup) cleanup();
+      };
     }
-
-    return () => {
-      supabase.removeAllChannels();
-    };
   }, [groupId, currentUser]);
 
   useEffect(() => {
@@ -244,7 +244,9 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
         table: 'group_messages',
         filter: `group_id=eq.${groupId}`
       }, (payload) => {
+        console.log('New message received:', payload.new);
         dispatch({ type: 'ADD_MESSAGE', payload: payload.new });
+        scrollToBottom();
       })
       .on('postgres_changes', {
         event: 'INSERT',
@@ -252,9 +254,43 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
         table: 'group_expenses',
         filter: `group_id=eq.${groupId}`
       }, () => {
+        console.log('New expense detected');
         fetchGroupData(); // Refetch all data when new expense is added
       })
-      .subscribe();
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'expense_splits'
+      }, () => {
+        console.log('Expense split updated');
+        fetchGroupData(); // Refetch when splits are updated (settled)
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'settlements',
+        filter: `group_id=eq.${groupId}`
+      }, () => {
+        console.log('Settlement changed');
+        fetchGroupData(); // Refetch when settlements change
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'group_members',
+        filter: `group_id=eq.${groupId}`
+      }, () => {
+        console.log('Group member updated (name change)');
+        fetchGroupData(); // Refetch when member names are updated
+      })
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status);
+      });
+
+    return () => {
+      console.log('Cleaning up realtime subscription');
+      supabase.removeChannel(channel);
+    };
   };
 
   // Parse AI response for structured actions
@@ -371,7 +407,7 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
         content: msg.content
       }));
 
-      const response = await fetch('/.netlify/functions/splitwise-ai', {
+      const response = await fetch('/api/ai/splitwise', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -388,7 +424,7 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
 
       if (!response.ok) throw new Error('AI request failed');
 
-      const { reply, parsedExpense } = await response.json();
+      const { reply, expense } = await response.json();
 
       // Save AI reply
       await supabase.from('group_messages').insert({
@@ -399,15 +435,106 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
         message_type: 'ai_response'
       });
 
-      // Parse AI action from response
-      const aiAction = parseAIAction(reply);
-      if (aiAction) {
-        await executeAIAction(aiAction);
-      }
+      // If AI returned an expense, create it automatically
+      if (expense) {
+        console.log('AI detected expense, creating automatically:', expense);
+        
+        // Ensure amount is a number
+        const amount = typeof expense.amount === 'number' ? expense.amount : parseFloat(expense.amount);
+        
+        if (isNaN(amount)) {
+          toast.error('Invalid amount detected');
+          return;
+        }
+        
+        // Determine who paid
+        const paidByName = expense.paidBy === 'current_user' 
+          ? displayName 
+          : expense.paidBy;
 
-      // If expense detected, show confirmation
-      if (parsedExpense?.isExpense) {
-        setPendingExpense(parsedExpense);
+        // Insert expense
+        const { data: expenseRow, error: expenseError } = await supabase
+          .from('group_expenses')
+          .insert({
+            group_id: groupId,
+            added_by: currentUser.id,
+            description: expense.description,
+            total_amount: amount,
+            is_group_fund_expense: expense.isGroupFund,
+            paid_by_name: paidByName
+          })
+          .select()
+          .single();
+
+        if (expenseError) throw expenseError;
+
+        // Insert splits if not group fund expense
+        const newSplits: any[] = [];
+        if (!expense.isGroupFund) {
+          // Equal split among all members
+          const splitAmount = amount / state.members.length;
+          
+          const splitsWithUserIds = state.members.map((member: any) => ({
+            expense_id: expenseRow.id,
+            user_id: member.user_id,
+            display_name: member.display_name,
+            amount_owed: splitAmount,
+            is_settled: false
+          }));
+
+          const { data: insertedSplits, error: splitsError } = await supabase
+            .from('expense_splits')
+            .insert(splitsWithUserIds)
+            .select();
+
+          if (splitsError) throw splitsError;
+          newSplits.push(...(insertedSplits || []));
+        }
+
+        // Update local state
+        dispatch({
+          type: 'ADD_EXPENSE',
+          payload: {
+            expense: expenseRow,
+            splits: newSplits
+          }
+        });
+
+        // Update group fund if group fund expense
+        if (expense.isGroupFund) {
+          const newFund = (state.group.group_fund || 0) - amount;
+          const { error: fundError } = await supabase
+            .from('split_groups')
+            .update({ group_fund: Math.max(0, newFund) })
+            .eq('id', groupId);
+
+          if (fundError) throw fundError;
+          dispatch({ type: 'UPDATE_GROUP_FUND', payload: Math.max(0, newFund) });
+        }
+
+        // Create proper metadata for expense log
+        const expenseMetadata = {
+          description: expense.description,
+          totalAmount: amount,
+          paidByName: paidByName,
+          isGroupFundExpense: expense.isGroupFund,
+          splits: !expense.isGroupFund ? state.members.map((member: any) => ({
+            name: member.display_name,
+            amount: amount / state.members.length
+          })) : []
+        };
+
+        // Post expense log message
+        await supabase.from('group_messages').insert({
+          group_id: groupId,
+          user_id: currentUser.id,
+          display_name: displayName,
+          content: expense.description,
+          message_type: 'expense_log',
+          metadata: expenseMetadata
+        });
+
+        toast.success('Expense added automatically!');
       }
 
     } catch (error: any) {
@@ -419,7 +546,7 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
         group_id: groupId,
         user_id: currentUser.id,
         display_name: 'RFin AI',
-        content: 'Sorry, I encountered an error processing your message. Please try rephrasing, like: "I paid ₹500 for dinner with Krisha"',
+        content: 'Sorry, I encountered an error processing your message. Please try again.',
         message_type: 'ai_error'
       });
     } finally {
@@ -540,6 +667,38 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
     setTimeout(() => setInviteLinkCopied(false), 2000);
   };
 
+  const handleClearChat = async () => {
+    if (!confirm('Are you sure you want to delete all chat messages (AI conversations only, not expenses)? This cannot be undone.')) {
+      return;
+    }
+
+    try {
+      // Delete only chat and AI messages, not expense logs
+      const chatMessageIds = state.messages
+        .filter(m => m.message_type === 'chat' || m.message_type === 'ai_response' || m.message_type === 'ai_error')
+        .map(m => m.id);
+
+      if (chatMessageIds.length === 0) {
+        toast.info('No chat messages to delete');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('group_messages')
+        .delete()
+        .in('id', chatMessageIds);
+
+      if (error) throw error;
+
+      // Refetch to update UI
+      await fetchGroupData();
+      toast.success('Chat history cleared!');
+    } catch (error) {
+      console.error('Error clearing chat:', error);
+      toast.error('Failed to clear chat history');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -639,27 +798,40 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
 
       {/* Tabs */}
       <div className="border-b border-border bg-white px-3 lg:px-6">
-        <div className="flex gap-4 lg:gap-6 overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('chat')}
-            className={`py-2 lg:py-3 px-1 border-b-2 font-['var(--font-dm-sans)'] font-medium transition-colors text-sm lg:text-base whitespace-nowrap ${
-              activeTab === 'chat'
-                ? 'border-[#8B4513] text-[#8B4513]'
-                : 'border-transparent text-[#6B5744] hover:text-[#8B4513]'
-            }`}
-          >
-            💬 Chat
-          </button>
-          <button
-            onClick={() => setActiveTab('summary')}
-            className={`py-2 lg:py-3 px-1 border-b-2 font-['var(--font-dm-sans)'] font-medium transition-colors text-sm lg:text-base whitespace-nowrap ${
-              activeTab === 'summary'
-                ? 'border-[#8B4513] text-[#8B4513]'
-                : 'border-transparent text-[#6B5744] hover:text-[#8B4513]'
-            }`}
-          >
-            📊 Summary
-          </button>
+        <div className="flex gap-4 lg:gap-6 overflow-x-auto items-center justify-between">
+          <div className="flex gap-4 lg:gap-6">
+            <button
+              onClick={() => setActiveTab('chat')}
+              className={`py-2 lg:py-3 px-1 border-b-2 font-['var(--font-dm-sans)'] font-medium transition-colors text-sm lg:text-base whitespace-nowrap ${
+                activeTab === 'chat'
+                  ? 'border-[#8B4513] text-[#8B4513]'
+                  : 'border-transparent text-[#6B5744] hover:text-[#8B4513]'
+              }`}
+            >
+              💬 Chat
+            </button>
+            <button
+              onClick={() => setActiveTab('summary')}
+              className={`py-2 lg:py-3 px-1 border-b-2 font-['var(--font-dm-sans)'] font-medium transition-colors text-sm lg:text-base whitespace-nowrap ${
+                activeTab === 'summary'
+                  ? 'border-[#8B4513] text-[#8B4513]'
+                  : 'border-transparent text-[#6B5744] hover:text-[#8B4513]'
+              }`}
+            >
+              📊 Summary
+            </button>
+          </div>
+          
+          {/* Delete chat button - only show in chat tab when there are messages */}
+          {activeTab === 'chat' && state.messages.filter(m => m.message_type === 'chat' || m.message_type === 'ai_response').length > 0 && (
+            <button
+              onClick={handleClearChat}
+              className="p-2 hover:bg-red-50 rounded-lg transition-colors group flex-shrink-0"
+              title="Clear chat history (keeps expenses)"
+            >
+              <Trash2 className="w-4 h-4 text-[#6B5744] group-hover:text-red-600" />
+            </button>
+          )}
         </div>
       </div>
 

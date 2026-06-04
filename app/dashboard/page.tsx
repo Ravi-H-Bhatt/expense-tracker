@@ -16,7 +16,10 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboardData();
-    subscribeToNotifications();
+    const unsubscribe = subscribeToNotifications();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const fetchDashboardData = async () => {
@@ -62,20 +65,29 @@ export default function DashboardPage() {
   };
 
   const subscribeToNotifications = () => {
-    const channel = supabase
-      .channel('dashboard-notifications')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications'
-      }, () => {
-        fetchDashboardData();
-      })
-      .subscribe();
+    try {
+      const channel = supabase
+        .channel('dashboard-notifications')
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications'
+        }, () => {
+          fetchDashboardData();
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('Subscribed to notifications');
+          }
+        });
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch (error) {
+      console.error('Error subscribing to notifications:', error);
+      return undefined;
+    }
   };
 
   const handlePayNow = async (notification: any) => {
@@ -140,10 +152,10 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <h2 className="text-xl font-['var(--font-playfair)'] font-semibold text-[#1A1208]">
-                    Payment Requests
+                    Notifications
                   </h2>
                   <p className="text-sm text-[#6B5744] font-['var(--font-dm-sans)']">
-                    {notifications.length} pending request{notifications.length !== 1 ? 's' : ''}
+                    {notifications.length} pending notification{notifications.length !== 1 ? 's' : ''}
                   </p>
                 </div>
               </div>
@@ -174,18 +186,111 @@ export default function DashboardPage() {
                       </p>
                     </div>
                     <div className="flex gap-2 w-full sm:w-auto">
-                      <button
-                        onClick={() => handlePayNow(notif)}
-                        className="flex-1 sm:flex-initial px-4 py-2 bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors text-sm font-medium whitespace-nowrap"
-                      >
-                        Pay Now
-                      </button>
-                      <button
-                        onClick={() => handleDismissNotification(notif.id)}
-                        className="flex-1 sm:flex-initial px-4 py-2 border border-[#E8DDD0] text-[#6B5744] rounded-lg hover:bg-[#F5EFE6] transition-colors text-sm font-medium whitespace-nowrap"
-                      >
-                        Dismiss
-                      </button>
+                      {/* Settlement pending confirmation */}
+                      {notif.type === 'settlement_pending' && notif.metadata?.action === 'confirm_settlement' && (
+                        <>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const response = await fetch('/api/payments/settle', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    payerId: notif.from_user_id,
+                                    payeeId: user.id,
+                                    amount: notif.amount,
+                                    groupId: notif.group_id,
+                                    action: 'confirm'
+                                  })
+                                });
+
+                                const result = await response.json();
+                                
+                                if (!response.ok) {
+                                  throw new Error(result.error || 'Failed to confirm');
+                                }
+
+                                await supabase
+                                  .from('notifications')
+                                  .update({ status: 'actioned', read_at: new Date().toISOString() })
+                                  .eq('id', notif.id);
+
+                                toast.success('Settlement confirmed! ✓');
+                                fetchDashboardData();
+                              } catch (error: any) {
+                                toast.error(error.message || 'Failed to confirm settlement');
+                              }
+                            }}
+                            className="flex-1 sm:flex-initial px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium whitespace-nowrap"
+                          >
+                            ✓ Confirm
+                          </button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const response = await fetch('/api/payments/settle', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    payerId: notif.from_user_id,
+                                    payeeId: user.id,
+                                    amount: notif.amount,
+                                    groupId: notif.group_id,
+                                    action: 'reject'
+                                  })
+                                });
+
+                                const result = await response.json();
+                                
+                                if (!response.ok) {
+                                  throw new Error(result.error || 'Failed to reject');
+                                }
+
+                                await supabase
+                                  .from('notifications')
+                                  .update({ status: 'actioned', read_at: new Date().toISOString() })
+                                  .eq('id', notif.id);
+
+                                toast.info('Settlement rejected.');
+                                fetchDashboardData();
+                              } catch (error: any) {
+                                toast.error(error.message || 'Failed to reject settlement');
+                              }
+                            }}
+                            className="flex-1 sm:flex-initial px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium whitespace-nowrap"
+                          >
+                            ✗ Reject
+                          </button>
+                        </>
+                      )}
+
+                      {/* Payment request */}
+                      {notif.type === 'payment_request' && (
+                        <>
+                          <button
+                            onClick={() => handlePayNow(notif)}
+                            className="flex-1 sm:flex-initial px-4 py-2 bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors text-sm font-medium whitespace-nowrap"
+                          >
+                            Pay Now
+                          </button>
+                          <button
+                            onClick={() => handleDismissNotification(notif.id)}
+                            className="flex-1 sm:flex-initial px-4 py-2 border border-[#E8DDD0] text-[#6B5744] rounded-lg hover:bg-[#F5EFE6] transition-colors text-sm font-medium whitespace-nowrap"
+                          >
+                            Dismiss
+                          </button>
+                        </>
+                      )}
+
+                      {/* Other notifications - just dismiss */}
+                      {notif.type !== 'settlement_pending' && notif.type !== 'payment_request' && (
+                        <button
+                          onClick={() => handleDismissNotification(notif.id)}
+                          className="flex-1 sm:flex-initial px-4 py-2 border border-[#E8DDD0] text-[#6B5744] rounded-lg hover:bg-[#F5EFE6] transition-colors text-sm font-medium whitespace-nowrap"
+                        >
+                          Dismiss
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

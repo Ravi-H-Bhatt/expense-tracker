@@ -13,7 +13,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { formatCurrency, formatDate } from '@/lib/format';
-import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Download, Calendar } from 'lucide-react';
+import { EnhancedPDFGenerator } from '@/lib/enhanced-pdf-generator';
 import type { Expense, ExpenseCategory, PaymentMethod } from '@/types';
 
 const categories: ExpenseCategory[] = ['Food', 'Petrol', 'Friends', 'Shopping', 'Bills', 'Entertainment', 'Travel', 'Other'];
@@ -37,6 +38,11 @@ export default function ExpensesPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [reportType, setReportType] = useState<'monthly' | 'yearly'>('monthly');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     amount: '',
@@ -49,8 +55,20 @@ export default function ExpensesPage() {
   const supabase = createClient();
 
   useEffect(() => {
-    fetchExpenses();
+    fetchUserAndExpenses();
   }, []);
+
+  const fetchUserAndExpenses = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      setCurrentUser(user);
+      await fetchExpenses();
+    } catch (error) {
+      console.error('Error fetching user:', error);
+    }
+  };
 
   const fetchExpenses = async () => {
     try {
@@ -141,6 +159,151 @@ export default function ExpensesPage() {
 
   const totalAmount = filteredExpenses.reduce((sum, exp) => sum + parseFloat(exp.amount.toString()), 0);
 
+  const handleExportReport = () => {
+    try {
+      const pdfGen = new EnhancedPDFGenerator();
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                         'July', 'August', 'September', 'October', 'November', 'December'];
+
+      const userName = currentUser?.user_metadata?.full_name || 
+                       currentUser?.email?.split('@')[0] || 
+                       'User';
+
+      if (reportType === 'monthly') {
+        // Filter expenses by selected month and year
+        const filteredByMonth = expenses.filter(exp => {
+          const expDate = new Date(exp.expense_date);
+          return expDate.getMonth() === selectedMonth && expDate.getFullYear() === selectedYear;
+        });
+
+        if (filteredByMonth.length === 0) {
+          toast.error('No expenses found for selected month');
+          return;
+        }
+
+        const totalAmount = filteredByMonth.reduce((sum, e) => sum + Number(e.amount), 0);
+
+        // Category breakdown
+        const categoryMap: Record<string, { amount: number; count: number }> = {};
+        filteredByMonth.forEach(exp => {
+          if (!categoryMap[exp.category]) {
+            categoryMap[exp.category] = { amount: 0, count: 0 };
+          }
+          categoryMap[exp.category].amount += Number(exp.amount);
+          categoryMap[exp.category].count += 1;
+        });
+
+        const categoryBreakdown = Object.entries(categoryMap).map(([category, data]) => ({
+          category,
+          amount: data.amount,
+          count: data.count
+        })).sort((a, b) => b.amount - a.amount);
+
+        // Payment method breakdown
+        const paymentMap: Record<string, { amount: number; count: number }> = {};
+        filteredByMonth.forEach(exp => {
+          const method = exp.payment_method || 'Not Specified';
+          if (!paymentMap[method]) {
+            paymentMap[method] = { amount: 0, count: 0 };
+          }
+          paymentMap[method].amount += Number(exp.amount);
+          paymentMap[method].count += 1;
+        });
+
+        const paymentMethodBreakdown = Object.entries(paymentMap).map(([method, data]) => ({
+          method,
+          amount: data.amount,
+          count: data.count
+        })).sort((a, b) => b.amount - a.amount);
+
+        pdfGen.generatePersonalMonthlyReport({
+          userName,
+          month: monthNames[selectedMonth],
+          year: selectedYear.toString(),
+          expenses: filteredByMonth,
+          totalAmount,
+          categoryBreakdown,
+          paymentMethodBreakdown
+        });
+
+        pdfGen.save(`Personal_Expenses_${monthNames[selectedMonth]}_${selectedYear}.pdf`);
+      } else {
+        // Yearly report
+        const monthlyData = monthNames.map((month, index) => {
+          const monthExpenses = expenses.filter(exp => {
+            const expDate = new Date(exp.expense_date);
+            return expDate.getMonth() === index && expDate.getFullYear() === selectedYear;
+          });
+
+          const categoryMap: Record<string, number> = {};
+          monthExpenses.forEach(exp => {
+            categoryMap[exp.category] = (categoryMap[exp.category] || 0) + Number(exp.amount);
+          });
+
+          return {
+            month,
+            totalExpenses: monthExpenses.length,
+            totalAmount: monthExpenses.reduce((sum, e) => sum + Number(e.amount), 0),
+            categories: categoryMap
+          };
+        });
+
+        const yearExpenses = expenses.filter(exp => {
+          const expDate = new Date(exp.expense_date);
+          return expDate.getFullYear() === selectedYear;
+        });
+
+        if (yearExpenses.length === 0) {
+          toast.error('No expenses found for selected year');
+          return;
+        }
+
+        const totalAmount = yearExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+
+        // Category breakdown for year
+        const categoryMap: Record<string, { amount: number; count: number }> = {};
+        yearExpenses.forEach(exp => {
+          if (!categoryMap[exp.category]) {
+            categoryMap[exp.category] = { amount: 0, count: 0 };
+          }
+          categoryMap[exp.category].amount += Number(exp.amount);
+          categoryMap[exp.category].count += 1;
+        });
+
+        const categoryBreakdown = Object.entries(categoryMap).map(([category, data]) => ({
+          category,
+          amount: data.amount,
+          count: data.count
+        })).sort((a, b) => b.amount - a.amount);
+
+        pdfGen.generatePersonalYearlyReport({
+          userName,
+          year: selectedYear.toString(),
+          monthlyData,
+          totalExpenses: yearExpenses.length,
+          totalAmount,
+          categoryBreakdown
+        });
+
+        pdfGen.save(`Personal_Expenses_Annual_${selectedYear}.pdf`);
+      }
+
+      toast.success('Report downloaded successfully!');
+      setShowExportMenu(false);
+    } catch (error) {
+      console.error('Error generating report:', error);
+      toast.error('Failed to generate report');
+    }
+  };
+
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -151,13 +314,22 @@ export default function ExpensesPage() {
             Track and manage your expenses
           </p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="lg">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Expense
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="lg"
+            onClick={() => setShowExportMenu(!showExportMenu)}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export PDF
+          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="lg">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Expense
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add New Expense</DialogTitle>
@@ -238,7 +410,95 @@ export default function ExpensesPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
+
+      {/* Export Menu */}
+      {showExportMenu && (
+        <Card className="glass-card">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Calendar className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-semibold">Export Expense Report</h3>
+            </div>
+            
+            <div className="mb-4">
+              <Label>Report Type</Label>
+              <div className="flex gap-2 mt-2">
+                <Button
+                  type="button"
+                  variant={reportType === 'monthly' ? 'default' : 'outline'}
+                  onClick={() => setReportType('monthly')}
+                  className="flex-1"
+                >
+                  📅 Monthly Report
+                </Button>
+                <Button
+                  type="button"
+                  variant={reportType === 'yearly' ? 'default' : 'outline'}
+                  onClick={() => setReportType('yearly')}
+                  className="flex-1"
+                >
+                  📊 Yearly Report
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              {reportType === 'monthly' && (
+                <div>
+                  <Label htmlFor="export-month">Select Month</Label>
+                  <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(Number(v))}>
+                    <SelectTrigger id="export-month">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {months.map((month, index) => (
+                        <SelectItem key={index} value={index.toString()}>
+                          {month}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className={reportType === 'yearly' ? 'col-span-2' : ''}>
+                <Label htmlFor="export-year">Select Year</Label>
+                <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(Number(v))}>
+                  <SelectTrigger id="export-year">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {years.map((year) => (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 mb-4">
+              {reportType === 'monthly' ? (
+                <p>📄 Monthly report includes: category breakdown, payment methods, and detailed expense list for {months[selectedMonth]} {selectedYear}</p>
+              ) : (
+                <p>📊 Yearly report includes: 12-month trend, annual category summary, and monthly breakdowns for {selectedYear}</p>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <Button onClick={handleExportReport} className="flex-1">
+                <Download className="w-4 h-4 mr-2" />
+                Generate {reportType === 'monthly' ? 'Monthly' : 'Yearly'} Report
+              </Button>
+              <Button variant="outline" onClick={() => setShowExportMenu(false)}>
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card className="glass-card">

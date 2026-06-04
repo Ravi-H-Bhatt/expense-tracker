@@ -79,7 +79,7 @@ CREATE POLICY "settlements_select" ON settlements FOR SELECT TO authenticated US
 );
 
 CREATE POLICY "settlements_insert" ON settlements FOR INSERT TO authenticated WITH CHECK (
-  payer_id = auth.uid() AND
+  payer_id = auth.uid() AN
   group_id IN (SELECT group_id FROM group_members WHERE user_id = auth.uid())
 );
 

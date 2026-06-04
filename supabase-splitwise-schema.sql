@@ -117,6 +117,7 @@ CREATE POLICY "message_all" ON group_messages FOR ALL TO authenticated USING (
 ALTER PUBLICATION supabase_realtime ADD TABLE group_messages;
 ALTER PUBLICATION supabase_realtime ADD TABLE group_expenses;
 ALTER PUBLICATION supabase_realtime ADD TABLE expense_splits;
+ALTER PUBLICATION supabase_realtime ADD TABLE group_members;
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_group_members_user_id ON group_members(user_id);

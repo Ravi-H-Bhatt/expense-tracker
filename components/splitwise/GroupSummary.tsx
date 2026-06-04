@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Download, Calendar } from 'lucide-react';
+import { SplitwisePDFGenerator } from '@/lib/splitwise-pdf-generator';
 
 interface GroupSummaryProps {
   group: any;
@@ -31,11 +32,20 @@ export default function GroupSummary({
 }: GroupSummaryProps) {
   const supabase = createClient();
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [isSettling, setIsSettling] = useState(false);
+  const [processingNotif, setProcessingNotif] = useState<string | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [reportType, setReportType] = useState<'monthly' | 'yearly'>('monthly');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
     if (currentUser?.id) {
       fetchNotifications();
-      subscribeToNotifications();
+      const unsubscribe = subscribeToNotifications();
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
     }
   }, [currentUser?.id]);
 
@@ -49,27 +59,56 @@ export default function GroupSummary({
       .eq('status', 'unread')
       .order('created_at', { ascending: false });
     
-    if (data) setNotifications(data);
+    if (data) {
+      // Deduplicate notifications by type, group_id, from_user_id, and amount
+      // Keep only the most recent one for each unique combination
+      const seen = new Set<string>();
+      const uniqueNotifications = data.filter((notif) => {
+        const key = `${notif.type}-${notif.group_id}-${notif.from_user_id}-${notif.amount}`;
+        if (seen.has(key)) {
+          // Mark duplicate as read silently
+          supabase
+            .from('notifications')
+            .update({ status: 'read', read_at: new Date().toISOString() })
+            .eq('id', notif.id)
+            .then();
+          return false;
+        }
+        seen.add(key);
+        return true;
+      });
+      
+      setNotifications(uniqueNotifications);
+    }
   };
 
   const subscribeToNotifications = () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) return undefined;
 
-    const channel = supabase
-      .channel('notifications')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${currentUser.id}`
-      }, () => {
-        fetchNotifications();
-      })
-      .subscribe();
+    try {
+      const channel = supabase
+        .channel('notifications')
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${currentUser.id}`
+        }, () => {
+          fetchNotifications();
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('Subscribed to notifications');
+          }
+        });
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch (error) {
+      console.error('Error subscribing to notifications:', error);
+      return undefined;
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -122,6 +161,26 @@ export default function GroupSummary({
           status: 'unread'
         });
 
+      // Send email to debtor
+      console.log('📧 Sending payment request email...');
+      const response = await fetch('/api/payments/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requesterId: currentUser.id,
+          debtorId: debtor.user_id,
+          amount: amount,
+          groupId: groupId,
+          groupName: group.name
+        })
+      });
+
+      if (response.ok) {
+        console.log('✅ Payment request email sent');
+      } else {
+        console.error('❌ Failed to send payment request email');
+      }
+
       toast.success(`Payment request sent to ${memberName}!`);
       onUpdate();
     } catch (error) {
@@ -130,37 +189,69 @@ export default function GroupSummary({
     }
   };
 
-  const handleSettleUp = async (memberName: string) => {
-    try {
-      // Find all unsettled splits for this member across all expenses
-      const memberSplits = splits.filter(s => 
-        s.display_name === memberName && 
-        !s.is_settled &&
-        expenses.find(e => e.id === s.expense_id)
-      );
+  const handleSettleUp = async (creditorName: string, creditorUserId: string) => {
+    if (isSettling) {
+      toast.info('Please wait, processing previous settlement...');
+      return;
+    }
 
-      if (memberSplits.length === 0) {
-        toast.info('No outstanding debts to settle');
+    try {
+      setIsSettling(true);
+      
+      if (!groupId || !currentUser?.id) {
+        toast.error('Cannot settle - missing data');
         return;
       }
 
-      // Update all splits to settled
-      const { error } = await supabase
-        .from('expense_splits')
-        .update({ 
-          is_settled: true, 
-          settled_at: new Date().toISOString(),
-          settled_with_user_id: currentUser.id
+      const creditorBalance = balances[creditorName];
+      if (!creditorBalance) {
+        toast.error('Creditor balance not found');
+        return;
+      }
+
+      // Current user (debtor) owes money to creditor
+      const currentUserBalance = Object.entries(balances).find(
+        ([_, data]: any) => data.userId === currentUser.id
+      );
+      
+      if (!currentUserBalance) {
+        toast.error('Your balance not found');
+        return;
+      }
+
+      const amountOwed = Math.abs(currentUserBalance[1].net);
+      
+      if (amountOwed === 0) {
+        toast.info('No outstanding debt to settle');
+        return;
+      }
+
+      // Call the settlement API to initiate settlement
+      const response = await fetch('/api/payments/settle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          payerId: currentUser.id,
+          payeeId: creditorUserId,
+          amount: amountOwed,
+          groupId: groupId,
+          action: 'initiate'
         })
-        .in('id', memberSplits.map(s => s.id));
+      });
 
-      if (error) throw error;
+      const result = await response.json();
 
-      toast.success(`Settled all debts with ${memberName}!`);
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to initiate settlement');
+      }
+
+      toast.success(`Settlement initiated! ${creditorName} will receive a notification to confirm receipt.`);
       onUpdate();
-    } catch (error) {
-      toast.error('Failed to settle');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to settle');
       console.error(error);
+    } finally {
+      setIsSettling(false);
     }
   };
 
@@ -214,44 +305,433 @@ export default function GroupSummary({
     value
   }));
 
+  const handleExportReport = () => {
+    try {
+      const pdfGen = new SplitwisePDFGenerator();
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                         'July', 'August', 'September', 'October', 'November', 'December'];
+
+      if (reportType === 'monthly') {
+        // Filter expenses by selected month and year
+        const filteredExpenses = expenses.filter(exp => {
+          const expDate = new Date(exp.created_at);
+          return expDate.getMonth() === selectedMonth && expDate.getFullYear() === selectedYear;
+        });
+
+        if (filteredExpenses.length === 0) {
+          toast.error('No expenses found for selected month');
+          return;
+        }
+
+        const totalSpent = filteredExpenses.reduce((sum, e) => sum + Number(e.total_amount), 0);
+
+        // Calculate category breakdown
+        const categoryMap: Record<string, number> = {};
+        filteredExpenses.forEach(exp => {
+          const desc = exp.description.toLowerCase();
+          let category = 'Other';
+          
+          if (desc.includes('food') || desc.includes('dinner') || desc.includes('lunch')) {
+            category = 'Food';
+          } else if (desc.includes('transport') || desc.includes('uber') || desc.includes('taxi')) {
+            category = 'Transport';
+          } else if (desc.includes('shop')) {
+            category = 'Shopping';
+          } else if (desc.includes('movie') || desc.includes('entertainment')) {
+            category = 'Entertainment';
+          } else if (desc.includes('grocery')) {
+            category = 'Groceries';
+          }
+          
+          categoryMap[category] = (categoryMap[category] || 0) + Number(exp.total_amount);
+        });
+
+        const categoryBreakdown = Object.entries(categoryMap).map(([category, amount]) => ({
+          category,
+          amount
+        })).sort((a, b) => b.amount - a.amount);
+
+        const memberBalances = Object.entries(balances).map(([name, data]: [string, any]) => ({
+          name,
+          paid: data.paid,
+          owes: data.owes,
+          net: data.net
+        }));
+
+        pdfGen.generateMonthlyGroupReport({
+          groupName: group.name,
+          month: monthNames[selectedMonth],
+          year: selectedYear.toString(),
+          expenses: filteredExpenses,
+          members: memberBalances,
+          totalSpent,
+          groupFund: group.group_fund || 0,
+          categoryBreakdown
+        });
+
+        pdfGen.save(`${group.name.replace(/[^a-z0-9]/gi, '_')}_${monthNames[selectedMonth]}_${selectedYear}.pdf`);
+      } else {
+        // Yearly report
+        const monthlyData = monthNames.map((month, index) => {
+          const monthExpenses = expenses.filter(exp => {
+            const expDate = new Date(exp.created_at);
+            return expDate.getMonth() === index && expDate.getFullYear() === selectedYear;
+          });
+
+          return {
+            month,
+            totalExpenses: monthExpenses.length,
+            totalAmount: monthExpenses.reduce((sum, e) => sum + Number(e.total_amount), 0),
+            memberCount: members.length
+          };
+        });
+
+        const yearExpenses = expenses.filter(exp => {
+          const expDate = new Date(exp.created_at);
+          return expDate.getFullYear() === selectedYear;
+        });
+
+        if (yearExpenses.length === 0) {
+          toast.error('No expenses found for selected year');
+          return;
+        }
+
+        const totalAmount = yearExpenses.reduce((sum, e) => sum + Number(e.total_amount), 0);
+
+        // Category breakdown for year
+        const categoryMap: Record<string, number> = {};
+        yearExpenses.forEach(exp => {
+          const desc = exp.description.toLowerCase();
+          let category = 'Other';
+          
+          if (desc.includes('food') || desc.includes('dinner') || desc.includes('lunch')) {
+            category = 'Food';
+          } else if (desc.includes('transport') || desc.includes('uber') || desc.includes('taxi')) {
+            category = 'Transport';
+          } else if (desc.includes('shop')) {
+            category = 'Shopping';
+          } else if (desc.includes('movie') || desc.includes('entertainment')) {
+            category = 'Entertainment';
+          } else if (desc.includes('grocery')) {
+            category = 'Groceries';
+          }
+          
+          categoryMap[category] = (categoryMap[category] || 0) + Number(exp.total_amount);
+        });
+
+        const categoryBreakdown = Object.entries(categoryMap).map(([category, amount]) => ({
+          category,
+          amount
+        })).sort((a, b) => b.amount - a.amount);
+
+        const memberBalances = Object.entries(balances).map(([name, data]: [string, any]) => ({
+          name,
+          paid: data.paid,
+          owes: data.owes,
+          net: data.net
+        }));
+
+        pdfGen.generateYearlyGroupReport({
+          groupName: group.name,
+          year: selectedYear.toString(),
+          monthlyData,
+          members: memberBalances,
+          totalExpenses: yearExpenses.length,
+          totalAmount,
+          categoryBreakdown
+        });
+
+        pdfGen.save(`${group.name.replace(/[^a-z0-9]/gi, '_')}_Annual_${selectedYear}.pdf`);
+      }
+
+      toast.success('Report downloaded successfully!');
+      setShowExportMenu(false);
+    } catch (error) {
+      console.error('Error generating report:', error);
+      toast.error('Failed to generate report');
+    }
+  };
+
+  // Generate month and year options
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+
   return (
     <div className="h-full overflow-y-auto p-3 lg:p-6 space-y-4 lg:space-y-6">
+      {/* Export Report Section */}
+      <div className="bg-white rounded-2xl border border-[#E8DDD0] p-4 lg:p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Download className="w-5 h-5 text-[#8B4513]" />
+            <h3 className="font-['var(--font-playfair)'] font-semibold text-[#1A1208] text-lg lg:text-xl">
+              Export Monthly Report
+            </h3>
+          </div>
+          <button
+            onClick={() => setShowExportMenu(!showExportMenu)}
+            className="px-4 py-2 bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors text-sm font-['var(--font-dm-sans)'] font-medium flex items-center gap-2"
+          >
+            <Calendar className="w-4 h-4" />
+            Export PDF
+          </button>
+        </div>
+
+        {showExportMenu && (
+          <div className="bg-[#F5EFE6] rounded-xl p-4 space-y-4">
+            <div>
+              <label className="block text-sm font-['var(--font-dm-sans)'] font-medium text-[#6B5744] mb-2">
+                Report Type
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setReportType('monthly')}
+                  className={`flex-1 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
+                    reportType === 'monthly'
+                      ? 'bg-[#8B4513] text-white'
+                      : 'bg-white text-[#8B4513] border border-[#D4956A]'
+                  }`}
+                >
+                  📅 Monthly Report
+                </button>
+                <button
+                  onClick={() => setReportType('yearly')}
+                  className={`flex-1 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
+                    reportType === 'yearly'
+                      ? 'bg-[#8B4513] text-white'
+                      : 'bg-white text-[#8B4513] border border-[#D4956A]'
+                  }`}
+                >
+                  📊 Yearly Report
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {reportType === 'monthly' && (
+                <div>
+                  <label className="block text-sm font-['var(--font-dm-sans)'] font-medium text-[#6B5744] mb-2">
+                    Select Month
+                  </label>
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-[#D4956A] rounded-lg text-[#1A1208] focus:outline-none focus:ring-2 focus:ring-[#8B4513] font-['var(--font-dm-sans)']"
+                  >
+                    {months.map((month, index) => (
+                      <option key={index} value={index}>
+                        {month}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className={reportType === 'yearly' ? 'col-span-2' : ''}>
+                <label className="block text-sm font-['var(--font-dm-sans)'] font-medium text-[#6B5744] mb-2">
+                  Select Year
+                </label>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-[#D4956A] rounded-lg text-[#1A1208] focus:outline-none focus:ring-2 focus:ring-[#8B4513] font-['var(--font-dm-sans)']"
+                >
+                  {years.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+              {reportType === 'monthly' ? (
+                <p>📄 Monthly report includes: member balances, category breakdown, and detailed expense list for {months[selectedMonth]} {selectedYear}</p>
+              ) : (
+                <p>📊 Yearly report includes: 12-month trend analysis, annual member contributions, category breakdown, and monthly summaries for {selectedYear}</p>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleExportReport}
+                className="flex-1 px-4 py-2 bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors text-sm font-['var(--font-dm-sans)'] font-medium flex items-center justify-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Generate {reportType === 'monthly' ? 'Monthly' : 'Yearly'} Report
+              </button>
+              <button
+                onClick={() => setShowExportMenu(false)}
+                className="px-4 py-2 border border-[#D4956A] text-[#8B4513] rounded-lg hover:bg-[#F5EFE6] transition-colors text-sm font-['var(--font-dm-sans)'] font-medium"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Payment Request Notifications */}
       {notifications.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 lg:p-6">
           <h3 className="font-['var(--font-playfair)'] font-semibold text-[#1A1208] text-lg lg:text-xl mb-3 lg:mb-4 flex items-center gap-2">
-            <span>🔔</span> Payment Requests
+            <span>🔔</span> Notifications
           </h3>
           <div className="space-y-3">
             {notifications.map((notif) => (
-              <div key={notif.id} className="bg-white rounded-xl p-4 flex items-center justify-between">
-                <div className="flex-1">
+              <div key={notif.id} className="bg-white rounded-xl p-4">
+                <div className="flex-1 mb-3">
                   <p className="font-['var(--font-dm-sans)'] font-medium text-[#1A1208] text-sm lg:text-base">
                     {notif.title}
                   </p>
                   <p className="text-xs lg:text-sm text-[#6B5744] mt-1">
                     {notif.message}
                   </p>
+                  {notif.amount && (
+                    <p className="text-lg font-['var(--font-playfair)'] font-bold text-[#8B4513] mt-2">
+                      ₹{notif.amount.toLocaleString('en-IN')}
+                    </p>
+                  )}
                 </div>
-                <button
-                  onClick={async () => {
-                    // Mark as read
-                    await supabase
-                      .from('notifications')
-                      .update({ status: 'read', read_at: new Date().toISOString() })
-                      .eq('id', notif.id);
-                    fetchNotifications();
-                    
-                    // Initiate settlement
-                    if (notif.type === 'payment_request') {
-                      // Handle payment
-                      toast.success('Marking as paid...');
-                    }
-                  }}
-                  className="px-4 py-2 bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors text-sm font-medium whitespace-nowrap ml-4"
-                >
-                  Pay Now
-                </button>
+                
+                {/* Settlement pending confirmation - show confirm/reject buttons */}
+                {notif.type === 'settlement_pending' && notif.metadata?.action === 'confirm_settlement' && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={async () => {
+                        if (processingNotif === notif.id) return;
+                        
+                        try {
+                          setProcessingNotif(notif.id);
+                          
+                          // Confirm settlement
+                          const response = await fetch('/api/payments/settle', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              payerId: notif.from_user_id,
+                              payeeId: currentUser.id,
+                              amount: notif.amount,
+                              groupId: notif.group_id,
+                              action: 'confirm'
+                            })
+                          });
+
+                          const result = await response.json();
+                          
+                          if (!response.ok) {
+                            throw new Error(result.error || 'Failed to confirm');
+                          }
+
+                          // Mark notification as read
+                          await supabase
+                            .from('notifications')
+                            .update({ status: 'actioned', read_at: new Date().toISOString() })
+                            .eq('id', notif.id);
+
+                          toast.success('Settlement confirmed! ✓');
+                          fetchNotifications();
+                          onUpdate();
+                        } catch (error: any) {
+                          toast.error(error.message || 'Failed to confirm settlement');
+                        } finally {
+                          setProcessingNotif(null);
+                        }
+                      }}
+                      disabled={processingNotif === notif.id}
+                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {processingNotif === notif.id ? 'Processing...' : '✓ Confirm Receipt'}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (processingNotif === notif.id) return;
+                        
+                        try {
+                          setProcessingNotif(notif.id);
+                          
+                          // Reject settlement
+                          const response = await fetch('/api/payments/settle', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              payerId: notif.from_user_id,
+                              payeeId: currentUser.id,
+                              amount: notif.amount,
+                              groupId: notif.group_id,
+                              action: 'reject'
+                            })
+                          });
+
+                          const result = await response.json();
+                          
+                          if (!response.ok) {
+                            throw new Error(result.error || 'Failed to reject');
+                          }
+
+                          // Mark notification as read
+                          await supabase
+                            .from('notifications')
+                            .update({ status: 'actioned', read_at: new Date().toISOString() })
+                            .eq('id', notif.id);
+
+                          toast.info('Settlement rejected. Payer notified.');
+                          fetchNotifications();
+                          onUpdate();
+                        } catch (error: any) {
+                          toast.error(error.message || 'Failed to reject settlement');
+                        } finally {
+                          setProcessingNotif(null);
+                        }
+                      }}
+                      disabled={processingNotif === notif.id}
+                      className="flex-1 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {processingNotif === notif.id ? 'Processing...' : '✗ Not Received'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Payment request - show Pay Now button */}
+                {notif.type === 'payment_request' && (
+                  <button
+                    onClick={async () => {
+                      // Mark as read
+                      await supabase
+                        .from('notifications')
+                        .update({ status: 'read', read_at: new Date().toISOString() })
+                        .eq('id', notif.id);
+                      fetchNotifications();
+                      
+                      toast.info('Navigate to the dashboard to complete payment');
+                    }}
+                    className="w-full px-4 py-2 bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors text-sm font-medium"
+                  >
+                    Pay Now
+                  </button>
+                )}
+
+                {/* Other notification types - show dismiss button */}
+                {notif.type !== 'settlement_pending' && notif.type !== 'payment_request' && (
+                  <button
+                    onClick={async () => {
+                      await supabase
+                        .from('notifications')
+                        .update({ status: 'read', read_at: new Date().toISOString() })
+                        .eq('id', notif.id);
+                      fetchNotifications();
+                      toast.success('Notification dismissed');
+                    }}
+                    className="w-full px-4 py-2 border border-[#E8DDD0] text-[#6B5744] rounded-lg hover:bg-[#F5EFE6] transition-colors text-sm font-medium"
+                  >
+                    Dismiss
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -332,25 +812,41 @@ export default function GroupSummary({
                       </span>
                     </td>
                     <td className="text-right py-2 lg:py-3 px-1 lg:px-2">
-                      {/* Current user's row */}
-                      {data.userId === currentUser?.id && data.net < 0 && (
-                        <button
-                          onClick={() => handleSettleUp(name)}
-                          className="px-2 lg:px-3 py-1 lg:py-1.5 text-xs bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors font-medium whitespace-nowrap"
-                          title={`Pay ₹${Math.abs(data.net).toLocaleString('en-IN')} to settle`}
-                        >
-                          Pay
-                        </button>
-                      )}
-                      {/* Other member's row who owes current user */}
-                      {data.userId !== currentUser?.id && data.net < 0 && (
-                        <button
-                          onClick={() => handleSendPaymentRequest(name, Math.abs(data.net))}
-                          className="px-2 lg:px-3 py-1 lg:py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium whitespace-nowrap"
-                          title={`Request ₹${Math.abs(data.net).toLocaleString('en-IN')} from ${name}`}
-                        >
-                          Request
-                        </button>
+                      {/* Show buttons based on balance relationship */}
+                      {data.net < 0 && (
+                        <>
+                          {/* This person owes money */}
+                          {data.userId === currentUser?.id ? (
+                            /* Current user owes - show Pay button */
+                            /* Find who current user owes to (person with positive balance) */
+                            <>
+                              {Object.entries(balances).filter(([_, otherData]: any) => otherData.net > 0).length > 0 && (
+                                <button
+                                  onClick={() => {
+                                    const creditor = Object.entries(balances).find(([_, otherData]: any) => otherData.net > 0);
+                                    if (creditor) {
+                                      handleSettleUp(creditor[0], creditor[1].userId);
+                                    }
+                                  }}
+                                  disabled={isSettling}
+                                  className="px-2 lg:px-3 py-1 lg:py-1.5 text-xs bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors font-medium whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title={`Pay ₹${Math.abs(data.net).toLocaleString('en-IN')}`}
+                                >
+                                  {isSettling ? 'Processing...' : 'Pay'}
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            /* Other person owes current user - show Request button */
+                            <button
+                              onClick={() => handleSendPaymentRequest(name, Math.abs(data.net))}
+                              className="px-2 lg:px-3 py-1 lg:py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium whitespace-nowrap"
+                              title={`Request ₹${Math.abs(data.net).toLocaleString('en-IN')} from ${name}`}
+                            >
+                              Request
+                            </button>
+                          )}
+                        </>
                       )}
                     </td>
                   </tr>

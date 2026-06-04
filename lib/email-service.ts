@@ -1,9 +1,15 @@
 /**
  * Email Service - Send payment requests and settlement confirmations
+ * Using Nodemailer with SMTP for reliable email delivery
  */
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY || '';
+import nodemailer from 'nodemailer';
+
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587');
+const SMTP_USER = process.env.SMTP_USER || '';
+const SMTP_PASS = process.env.SMTP_PASS || '';
+const SMTP_FROM = process.env.SMTP_FROM || 'noreply@rfin.app';
 
 interface EmailPayload {
   to: string;
@@ -11,59 +17,53 @@ interface EmailPayload {
   html: string;
 }
 
+// Create reusable transporter
+let transporter: any = null;
+
+function getTransporter() {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465, // true for 465, false for other ports
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS,
+      },
+    });
+  }
+  return transporter;
+}
+
 /**
- * Send email using Resend or SendGrid
+ * Send email using SMTP
  */
 export async function sendEmail(payload: EmailPayload): Promise<boolean> {
-  try {
-    // Try Resend first (recommended)
-    if (RESEND_API_KEY) {
-      const response = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${RESEND_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          from: 'payments@rfin.app',
-          to: payload.to,
-          subject: payload.subject,
-          html: payload.html
-        })
-      });
-
-      if (response.ok) {
-        console.log('Email sent via Resend');
-        return true;
-      }
-    }
-
-    // Fallback to SendGrid
-    if (SENDGRID_API_KEY) {
-      const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${SENDGRID_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          personalizations: [{ to: [{ email: payload.to }] }],
-          from: { email: 'noreply@rfin.app', name: 'RFin' },
-          subject: payload.subject,
-          content: [{ type: 'text/html', value: payload.html }]
-        })
-      });
-
-      if (response.ok) {
-        console.log('Email sent via SendGrid');
-        return true;
-      }
-    }
-
-    console.warn('No email service configured');
+  console.log('📧 ========== EMAIL SERVICE CALLED ==========');
+  console.log('📧 To:', payload.to);
+  console.log('📧 Subject:', payload.subject);
+  console.log('📧 SMTP configured:', !!SMTP_USER && !!SMTP_PASS);
+  
+  if (!SMTP_USER || !SMTP_PASS) {
+    console.error('❌ SMTP credentials not configured');
     return false;
+  }
+
+  try {
+    const transport = getTransporter();
+    
+    const info = await transport.sendMail({
+      from: `"RFin" <${SMTP_FROM}>`,
+      to: payload.to,
+      subject: payload.subject,
+      html: payload.html,
+    });
+
+    console.log('✅✅✅ EMAIL SENT SUCCESSFULLY ✅✅✅');
+    console.log('✅ Message ID:', info.messageId);
+    return true;
   } catch (error) {
-    console.error('Email error:', error);
+    console.error('❌❌❌ Email sending failed:', error);
     return false;
   }
 }
