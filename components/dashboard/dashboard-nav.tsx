@@ -34,6 +34,7 @@ const navigation = [
   { name: 'Budgets', href: '/dashboard/budgets', icon: Target },
   { name: 'AI Assistant', href: '/dashboard/ai-assistant', icon: Bot },
   { name: 'Splitwise', href: '/dashboard/splitwise', icon: Users },
+  { name: 'Profile', href: '/dashboard/profile', icon: Settings },
 ];
 
 export default function DashboardNav({ user, profile }: DashboardNavProps) {
