@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { sendPaymentRequestEmail } from '@/lib/email-service';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
@@ -55,6 +56,20 @@ export async function POST(request: NextRequest) {
     const requesterName = requester?.display_name || user.email?.split('@')[0] || 'Someone';
     const groupName = group?.name || 'Your group';
 
+    // Get debtor's email
+    const { data: debtor } = await supabase
+      .from('group_members')
+      .select('user_id')
+      .eq('user_id', toUserId)
+      .eq('group_id', groupId)
+      .single();
+
+    let debtorEmail = '';
+    if (debtor?.user_id) {
+      const { data: { user: debtorUser } } = await supabase.auth.admin.getUserById(debtor.user_id);
+      debtorEmail = debtorUser?.email || '';
+    }
+
     // Create notification for debtor
     const { error: notifError } = await supabase
       .from('notifications')
@@ -78,8 +93,18 @@ export async function POST(request: NextRequest) {
       // Don't fail the request if notification fails
     }
 
-    // TODO: Send email notification here
-    // await sendPaymentRequestEmail(requesterName, debtorEmail, amount, groupName);
+    // Send email notification
+    if (debtorEmail) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://rfin.app';
+      await sendPaymentRequestEmail(
+        requesterName,
+        debtorEmail,
+        requester?.display_name || 'User',
+        amount,
+        groupName,
+        appUrl
+      );
+    }
 
     return NextResponse.json({
       success: true,

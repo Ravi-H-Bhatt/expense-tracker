@@ -194,10 +194,14 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
   }, [messageInput]);
 
   const fetchGroupData = async () => {
-    setIsLoading(true);
     try {
-      // Parallel fetches for better performance
-      const [groupData, membersData, messagesData, expensesData, splitsData] = await Promise.all([
+      setIsLoading(true);
+      if (!groupId || !currentUser?.id) {
+        throw new Error('Missing group or user ID');
+      }
+
+      // Parallel fetches with error handling
+      const results = await Promise.allSettled([
         supabase.from('split_groups').select('*').eq('id', groupId).single(),
         supabase.from('group_members').select('*').eq('group_id', groupId).order('joined_at', { ascending: true }),
         supabase.from('group_messages').select('*').eq('group_id', groupId).order('created_at', { ascending: true }),
@@ -205,22 +209,27 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
         supabase.from('expense_splits').select('*')
       ]);
 
-      if (groupData.error) throw groupData.error;
+      const [groupResult, membersResult, messagesResult, expensesResult, splitsResult] = results;
+
+      if (groupResult.status === 'rejected' || !groupResult.value?.data) {
+        throw new Error('Failed to fetch group');
+      }
 
       dispatch({
         type: 'SET_INITIAL_DATA',
         payload: {
-          group: groupData.data,
-          members: membersData.data || [],
-          messages: messagesData.data || [],
-          expenses: expensesData.data || [],
-          splits: splitsData.data || []
+          group: groupResult.value.data,
+          members: membersResult.status === 'fulfilled' ? (membersResult.value?.data || []) : [],
+          messages: messagesResult.status === 'fulfilled' ? (messagesResult.value?.data || []) : [],
+          expenses: expensesResult.status === 'fulfilled' ? (expensesResult.value?.data || []) : [],
+          splits: splitsResult.status === 'fulfilled' ? (splitsResult.value?.data || []) : []
         }
       });
-
     } catch (error: any) {
-      toast.error('Failed to load group data');
-      console.error(error);
+      console.error('Error fetching group data:', error);
+      toast.error('Failed to load group. Retrying...');
+      // Retry once after 2 seconds
+      setTimeout(() => fetchGroupData(), 2000);
     } finally {
       setIsLoading(false);
     }
