@@ -196,57 +196,25 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
   const fetchGroupData = async () => {
     setIsLoading(true);
     try {
-      // Fetch group
-      const { data: groupData, error: groupError } = await supabase
-        .from('split_groups')
-        .select('*')
-        .eq('id', groupId)
-        .single();
+      // Parallel fetches for better performance
+      const [groupData, membersData, messagesData, expensesData, splitsData] = await Promise.all([
+        supabase.from('split_groups').select('*').eq('id', groupId).single(),
+        supabase.from('group_members').select('*').eq('group_id', groupId).order('joined_at', { ascending: true }),
+        supabase.from('group_messages').select('*').eq('group_id', groupId).order('created_at', { ascending: true }),
+        supabase.from('group_expenses').select('*').eq('group_id', groupId).order('created_at', { ascending: false }),
+        supabase.from('expense_splits').select('*')
+      ]);
 
-      if (groupError) throw groupError;
-
-      // Fetch members
-      const { data: membersData, error: membersError } = await supabase
-        .from('group_members')
-        .select('*')
-        .eq('group_id', groupId)
-        .order('joined_at', { ascending: true });
-
-      if (membersError) throw membersError;
-
-      // Fetch messages
-      const { data: messagesData, error: messagesError } = await supabase
-        .from('group_messages')
-        .select('*')
-        .eq('group_id', groupId)
-        .order('created_at', { ascending: true });
-
-      if (messagesError) throw messagesError;
-
-      // Fetch expenses
-      const { data: expensesData, error: expensesError } = await supabase
-        .from('group_expenses')
-        .select('*')
-        .eq('group_id', groupId)
-        .order('created_at', { ascending: false });
-
-      if (expensesError) throw expensesError;
-
-      // Fetch splits
-      const { data: splitsData, error: splitsError } = await supabase
-        .from('expense_splits')
-        .select('*');
-
-      if (splitsError) throw splitsError;
+      if (groupData.error) throw groupData.error;
 
       dispatch({
         type: 'SET_INITIAL_DATA',
         payload: {
-          group: groupData,
-          members: membersData || [],
-          messages: messagesData || [],
-          expenses: expensesData || [],
-          splits: splitsData || []
+          group: groupData.data,
+          members: membersData.data || [],
+          messages: messagesData.data || [],
+          expenses: expensesData.data || [],
+          splits: splitsData.data || []
         }
       });
 

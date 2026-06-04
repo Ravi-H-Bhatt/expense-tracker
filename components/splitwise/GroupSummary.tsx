@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -29,6 +30,47 @@ export default function GroupSummary({
   groupId
 }: GroupSummaryProps) {
   const supabase = createClient();
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      fetchNotifications();
+      subscribeToNotifications();
+    }
+  }, [currentUser?.id]);
+
+  const fetchNotifications = async () => {
+    if (!currentUser?.id) return;
+    
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .eq('status', 'unread')
+      .order('created_at', { ascending: false });
+    
+    if (data) setNotifications(data);
+  };
+
+  const subscribeToNotifications = () => {
+    if (!currentUser?.id) return;
+
+    const channel = supabase
+      .channel('notifications')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${currentUser.id}`
+      }, () => {
+        fetchNotifications();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', { 
@@ -174,6 +216,48 @@ export default function GroupSummary({
 
   return (
     <div className="h-full overflow-y-auto p-3 lg:p-6 space-y-4 lg:space-y-6">
+      {/* Payment Request Notifications */}
+      {notifications.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 lg:p-6">
+          <h3 className="font-['var(--font-playfair)'] font-semibold text-[#1A1208] text-lg lg:text-xl mb-3 lg:mb-4 flex items-center gap-2">
+            <span>🔔</span> Payment Requests
+          </h3>
+          <div className="space-y-3">
+            {notifications.map((notif) => (
+              <div key={notif.id} className="bg-white rounded-xl p-4 flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="font-['var(--font-dm-sans)'] font-medium text-[#1A1208] text-sm lg:text-base">
+                    {notif.title}
+                  </p>
+                  <p className="text-xs lg:text-sm text-[#6B5744] mt-1">
+                    {notif.message}
+                  </p>
+                </div>
+                <button
+                  onClick={async () => {
+                    // Mark as read
+                    await supabase
+                      .from('notifications')
+                      .update({ status: 'read', read_at: new Date().toISOString() })
+                      .eq('id', notif.id);
+                    fetchNotifications();
+                    
+                    // Initiate settlement
+                    if (notif.type === 'payment_request') {
+                      // Handle payment
+                      toast.success('Marking as paid...');
+                    }
+                  }}
+                  className="px-4 py-2 bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors text-sm font-medium whitespace-nowrap ml-4"
+                >
+                  Pay Now
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Group Fund Box */}
       {group.group_fund > 0 || totalGroupFundSpent > 0 ? (
         <div className="bg-[#FFF3CD] border border-[#F0C040] rounded-2xl p-4 lg:p-6">
@@ -248,23 +332,24 @@ export default function GroupSummary({
                       </span>
                     </td>
                     <td className="text-right py-2 lg:py-3 px-1 lg:px-2">
-                      {data.net > 0 && data.id === currentUser?.id ? null : null}
-                      {data.net > 0 && data.userId !== currentUser?.id && (
-                        <button
-                          onClick={() => handleSendPaymentRequest(name, data.net)}
-                          className="px-2 lg:px-3 py-1 lg:py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium whitespace-nowrap"
-                          title={`Request ₹${data.net.toLocaleString('en-IN')} from ${name}`}
-                        >
-                          Request
-                        </button>
-                      )}
-                      {data.net < 0 && data.userId === currentUser?.id && (
+                      {/* Current user's row */}
+                      {data.userId === currentUser?.id && data.net < 0 && (
                         <button
                           onClick={() => handleSettleUp(name)}
                           className="px-2 lg:px-3 py-1 lg:py-1.5 text-xs bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors font-medium whitespace-nowrap"
                           title={`Pay ₹${Math.abs(data.net).toLocaleString('en-IN')} to settle`}
                         >
                           Pay
+                        </button>
+                      )}
+                      {/* Other member's row who owes current user */}
+                      {data.userId !== currentUser?.id && data.net < 0 && (
+                        <button
+                          onClick={() => handleSendPaymentRequest(name, Math.abs(data.net))}
+                          className="px-2 lg:px-3 py-1 lg:py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium whitespace-nowrap"
+                          title={`Request ₹${Math.abs(data.net).toLocaleString('en-IN')} from ${name}`}
+                        >
+                          Request
                         </button>
                       )}
                     </td>
