@@ -58,36 +58,55 @@ export class SplitwisePDFGenerator {
   }
 
   private drawHeader(title: string, subtitle: string) {
+    // Base band
     this.doc.setFillColor(...COLORS.primary);
-    this.doc.rect(0, 0, this.pageWidth, 50, 'F');
+    this.doc.rect(0, 0, this.pageWidth, 52, 'F');
+    // Lighter accent stripe for depth
+    this.doc.setFillColor(...COLORS.secondary);
+    this.doc.rect(0, 48, this.pageWidth, 4, 'F');
 
+    // Decorative circles (subtle)
+    this.doc.setFillColor(16, 185, 129);
+    this.doc.circle(this.pageWidth - 18, 12, 14, 'F');
+    this.doc.setFillColor(5, 150, 105);
+    this.doc.circle(this.pageWidth - 4, 30, 10, 'F');
+
+    // Brand tag
     this.doc.setTextColor(...COLORS.white);
-    this.doc.setFontSize(28);
+    this.doc.setFontSize(9);
     this.doc.setFont('helvetica', 'bold');
-    this.doc.text(title, this.pageWidth / 2, 22, { align: 'center' });
+    this.doc.text('RFIN · SPLITWISE', this.margin, 14);
 
-    this.doc.setFontSize(14);
+    this.doc.setFontSize(26);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.text(title, this.margin, 30);
+
+    this.doc.setFontSize(13);
     this.doc.setFont('helvetica', 'normal');
-    this.doc.text(subtitle, this.pageWidth / 2, 35, { align: 'center' });
+    this.doc.text(subtitle, this.margin, 42);
 
-    this.currentY = 60;
+    this.currentY = 64;
   }
 
   private drawInfoBox(label: string, value: string, x: number, y: number, width: number, color: number[] = COLORS.bg as any) {
     this.doc.setFillColor(...(color as [number, number, number]));
     this.doc.setDrawColor(...COLORS.secondary);
-    this.doc.setLineWidth(0.5);
-    this.doc.roundedRect(x, y, width, 22, 3, 3, 'FD');
+    this.doc.setLineWidth(0.4);
+    this.doc.roundedRect(x, y, width, 24, 3, 3, 'FD');
 
-    this.doc.setFontSize(10);
+    // Top accent dot
+    this.doc.setFillColor(...COLORS.primary);
+    this.doc.circle(x + 5, y + 6, 1.2, 'F');
+
+    this.doc.setFontSize(9);
     this.doc.setFont('helvetica', 'normal');
     this.doc.setTextColor(...COLORS.textLight);
-    this.doc.text(label, x + 5, y + 8);
+    this.doc.text(label.toUpperCase(), x + 9, y + 8);
 
-    this.doc.setFontSize(16);
+    this.doc.setFontSize(15);
     this.doc.setFont('helvetica', 'bold');
     this.doc.setTextColor(...COLORS.primary);
-    this.doc.text(value, x + 5, y + 17);
+    this.doc.text(value, x + 5, y + 18);
   }
 
   private drawSectionHeader(title: string, _icon?: string) {
@@ -189,6 +208,101 @@ export class SplitwisePDFGenerator {
     return `Rs. ${Math.abs(amount).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   }
 
+  // Draw a highlighted callout panel with a few key insight lines.
+  private drawInsightsPanel(lines: { label: string; value: string }[]) {
+    if (lines.length === 0) return;
+    this.checkPageBreak(20 + lines.length * 8);
+    this.drawSectionHeader('Key Insights');
+
+    const panelH = lines.length * 8 + 8;
+    this.doc.setFillColor(...COLORS.bg);
+    this.doc.setDrawColor(...COLORS.secondary);
+    this.doc.setLineWidth(0.4);
+    this.doc.roundedRect(this.margin, this.currentY, this.pageWidth - 2 * this.margin, panelH, 3, 3, 'FD');
+
+    lines.forEach((line, i) => {
+      const y = this.currentY + 8 + i * 8;
+      this.doc.setFillColor(...COLORS.primary);
+      this.doc.circle(this.margin + 6, y - 1.2, 1, 'F');
+
+      this.doc.setFontSize(10);
+      this.doc.setFont('helvetica', 'normal');
+      this.doc.setTextColor(...COLORS.text);
+      this.doc.text(line.label, this.margin + 11, y);
+
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.setTextColor(...COLORS.primary);
+      this.doc.text(line.value, this.pageWidth - this.margin - 4, y, { align: 'right' });
+    });
+
+    this.currentY += panelH + 10;
+  }
+
+  // Compute a minimal "who pays whom" settlement plan from member net balances.
+  // Greedy match: largest debtor pays largest creditor until everyone nets to ~0.
+  private computeSettlementPlan(members: MemberExpense[]): { from: string; to: string; amount: number }[] {
+    const creditors = members
+      .filter(m => m.net > 0.5)
+      .map(m => ({ name: m.name, amt: m.net }))
+      .sort((a, b) => b.amt - a.amt);
+    const debtors = members
+      .filter(m => m.net < -0.5)
+      .map(m => ({ name: m.name, amt: -m.net }))
+      .sort((a, b) => b.amt - a.amt);
+
+    const plan: { from: string; to: string; amount: number }[] = [];
+    let i = 0;
+    let j = 0;
+    // Guard against infinite loops with a hard cap.
+    let guard = 0;
+    const maxIterations = (creditors.length + debtors.length) * 2 + 5;
+
+    while (i < debtors.length && j < creditors.length && guard < maxIterations) {
+      guard += 1;
+      const pay = Math.min(debtors[i].amt, creditors[j].amt);
+      if (pay > 0.5) {
+        plan.push({ from: debtors[i].name, to: creditors[j].name, amount: Math.round(pay) });
+      }
+      debtors[i].amt -= pay;
+      creditors[j].amt -= pay;
+      if (debtors[i].amt <= 0.5) i += 1;
+      if (creditors[j].amt <= 0.5) j += 1;
+    }
+
+    return plan;
+  }
+
+  private drawSettlementPlan(members: MemberExpense[]) {
+    const plan = this.computeSettlementPlan(members);
+
+    this.checkPageBreak(30);
+    this.drawSectionHeader('Settlement Plan (Who Pays Whom)');
+
+    if (plan.length === 0) {
+      this.doc.setFillColor(...COLORS.bg);
+      this.doc.setDrawColor(...COLORS.secondary);
+      this.doc.setLineWidth(0.4);
+      this.doc.roundedRect(this.margin, this.currentY, this.pageWidth - 2 * this.margin, 16, 3, 3, 'FD');
+      this.doc.setFontSize(11);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.setTextColor(...COLORS.success);
+      this.doc.text('All settled up — no payments needed.', this.pageWidth / 2, this.currentY + 10, { align: 'center' });
+      this.currentY += 24;
+      return;
+    }
+
+    this.drawTable(
+      ['From (pays)', '', 'To (receives)', 'Amount'],
+      plan.map(p => [p.from, '->', p.to, this.formatCurrency(p.amount)]),
+      {
+        0: { halign: 'left', cellWidth: 60, textColor: COLORS.danger },
+        1: { halign: 'center', cellWidth: 15 },
+        2: { halign: 'left', cellWidth: 60, textColor: COLORS.success },
+        3: { halign: 'right', cellWidth: 35, fontStyle: 'bold', textColor: COLORS.primary }
+      }
+    );
+  }
+
   private addFooters(reportType: string) {
     const pageCount = this.doc.internal.pages.length - 1;
     
@@ -247,7 +361,24 @@ export class SplitwisePDFGenerator {
     this.drawInfoBox('Expenses', data.expenses.length.toString(), this.margin + boxWidth + 5, this.currentY, boxWidth);
     this.drawInfoBox('Total Spent', this.formatCurrency(data.totalSpent), this.margin + 2 * (boxWidth + 5), this.currentY, boxWidth);
     this.drawInfoBox('Group Fund', this.formatCurrency(data.groupFund), this.margin + 3 * (boxWidth + 5), this.currentY, boxWidth, [200, 255, 220]);
-    this.currentY += 30;
+    this.currentY += 32;
+
+    // Key insights panel
+    if (data.members.length > 0 || data.expenses.length > 0) {
+      const topSpender = [...data.members].sort((a, b) => b.paid - a.paid)[0];
+      const topCategory = [...data.categoryBreakdown].sort((a, b) => b.amount - a.amount)[0];
+      const avgPerExpense = data.expenses.length > 0 ? data.totalSpent / data.expenses.length : 0;
+      const insights: { label: string; value: string }[] = [];
+      if (topSpender && topSpender.paid > 0) {
+        insights.push({ label: 'Top contributor', value: `${topSpender.name} · ${this.formatCurrency(topSpender.paid)}` });
+      }
+      if (topCategory) {
+        insights.push({ label: 'Biggest category', value: `${topCategory.category} · ${this.formatCurrency(topCategory.amount)}` });
+      }
+      insights.push({ label: 'Average per expense', value: this.formatCurrency(avgPerExpense) });
+      insights.push({ label: 'Total expenses logged', value: `${data.expenses.length}` });
+      this.drawInsightsPanel(insights);
+    }
 
     // Member contribution analysis
     if (data.members.length > 0) {
@@ -291,6 +422,9 @@ export class SplitwisePDFGenerator {
           4: { halign: 'center', cellWidth: 30 }
         }
       );
+
+      // Settlement plan — who pays whom to clear all debts
+      this.drawSettlementPlan(data.members);
     }
 
     // Category breakdown

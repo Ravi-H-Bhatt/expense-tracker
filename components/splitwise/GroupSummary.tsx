@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { Trash2, Download, Calendar } from 'lucide-react';
 import { SplitwisePDFGenerator } from '@/lib/splitwise-pdf-generator';
+import { resolveDisplayName } from '@/lib/display-name';
 
 interface GroupSummaryProps {
   group: any;
@@ -35,6 +36,7 @@ export default function GroupSummary({
   const [isSettling, setIsSettling] = useState(false);
   const [processingNotif, setProcessingNotif] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [isRemindingAll, setIsRemindingAll] = useState(false);
   const [reportType, setReportType] = useState<'monthly' | 'yearly'>('monthly');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -132,7 +134,8 @@ export default function GroupSummary({
         return;
       }
 
-      const requesterName = currentUser.profile?.full_name || currentUser.email?.split('@')[0] || 'Someone';
+      const requesterName = members.find(m => m.user_id === currentUser.id)?.display_name
+        || resolveDisplayName(currentUser, currentUser?.profile);
 
       // Record the payment request + in-app notification (best-effort, must not block email)
       const { error: prError } = await supabase
@@ -191,6 +194,108 @@ export default function GroupSummary({
     } catch (error: any) {
       toast.error(error?.message || 'Failed to send payment request');
       console.error(error);
+    }
+  };
+
+  // Members who owe the current user money (current user is a net creditor for them).
+  // A debtor owes the current user only if BOTH: the debtor has a negative net,
+  // AND the current user has a positive net (is owed money overall).
+  const getDebtorsOwingCurrentUser = () => {
+    const currentUserEntry = Object.entries(balances).find(
+      ([_, data]: any) => data.userId === currentUser?.id
+    );
+    // Current user must be owed money overall to chase anyone.
+    if (!currentUserEntry || currentUserEntry[1].net <= 0) return [];
+
+    return Object.entries(balances)
+      .filter(([name, data]: any) => data.userId !== currentUser?.id && data.net < 0)
+      .map(([name, data]: any) => ({ name, amount: Math.abs(data.net), userId: data.userId }));
+  };
+
+  const handleRemindAll = async () => {
+    if (isRemindingAll) return;
+
+    if (!groupId || !currentUser?.id) {
+      toast.error('Cannot send reminders - missing data');
+      return;
+    }
+
+    const debtors = getDebtorsOwingCurrentUser();
+    if (debtors.length === 0) {
+      toast.info('No one owes you right now — nothing to remind.');
+      return;
+    }
+
+    setIsRemindingAll(true);
+    const requesterName =
+      currentUser.profile?.full_name || currentUser.email?.split('@')[0] || 'Someone';
+
+    let emailed = 0;
+    let notified = 0;
+
+    try {
+      for (const debtor of debtors) {
+        if (!debtor.userId) continue;
+
+        // Best-effort in-app record + notification (must not block email)
+        await supabase.from('payment_requests').insert({
+          from_user_id: currentUser.id,
+          to_user_id: debtor.userId,
+          amount: debtor.amount,
+          group_id: groupId,
+          status: 'pending',
+          created_at: new Date().toISOString(),
+        });
+
+        const { error: notifError } = await supabase.from('notifications').insert({
+          user_id: debtor.userId,
+          type: 'payment_request',
+          title: `Payment reminder from ${requesterName}`,
+          message: `${requesterName} is requesting ${formatCurrency(debtor.amount)} in ${group.name}`,
+          group_id: groupId,
+          from_user_id: currentUser.id,
+          amount: debtor.amount,
+          status: 'unread',
+        });
+        if (!notifError) notified += 1;
+
+        // Reminder email — primary action
+        try {
+          const response = await fetch('/api/payments/request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              requesterId: currentUser.id,
+              debtorId: debtor.userId,
+              amount: debtor.amount,
+              groupId: groupId,
+              groupName: group.name,
+            }),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (response.ok && result.emailSent) emailed += 1;
+        } catch (err) {
+          console.error('Remind-all email failed for', debtor.name, err);
+        }
+      }
+
+      if (emailed > 0) {
+        toast.success(
+          `Reminders sent to ${emailed} ${emailed === 1 ? 'person' : 'people'}` +
+            (emailed < debtors.length ? ` (${debtors.length - emailed} in-app only)` : '')
+        );
+      } else if (notified > 0) {
+        toast.warning(`Notified ${notified} in-app, but emails could not be sent.`);
+      } else {
+        toast.error('Could not send reminders. Please try again.');
+      }
+
+      onUpdate();
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to send reminders');
+      console.error(error);
+    } finally {
+      setIsRemindingAll(false);
     }
   };
 
@@ -776,9 +881,24 @@ export default function GroupSummary({
 
       {/* Balance Sheet */}
       <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 lg:p-6 hover-lift">
-        <h3 className="font-['var(--font-playfair)'] font-semibold text-[#0F172A] text-lg lg:text-xl mb-3 lg:mb-4">
-          Balance Sheet
-        </h3>
+        <div className="flex items-center justify-between mb-3 lg:mb-4 gap-2">
+          <h3 className="font-['var(--font-playfair)'] font-semibold text-[#0F172A] text-lg lg:text-xl">
+            Balance Sheet
+          </h3>
+          {getDebtorsOwingCurrentUser().length > 1 && (
+            <button
+              onClick={handleRemindAll}
+              disabled={isRemindingAll}
+              className="press inline-flex items-center gap-1.5 px-3 lg:px-4 py-1.5 lg:py-2 bg-[#047857] text-white rounded-lg hover:bg-[#065F46] transition-colors text-xs lg:text-sm font-['var(--font-dm-sans)'] font-medium whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Send a reminder email to everyone who owes you"
+            >
+              <span>🔔</span>
+              {isRemindingAll
+                ? 'Reminding...'
+                : `Remind All (${getDebtorsOwingCurrentUser().length})`}
+            </button>
+          )}
+        </div>
         
         <div className="overflow-x-auto -mx-4 lg:mx-0">
           <div className="inline-block min-w-full align-middle px-4 lg:px-0">
@@ -873,40 +993,89 @@ export default function GroupSummary({
 
       {/* Pie Chart - Reactive with Empty State */}
       <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 lg:p-6 hover-lift">
-        <h3 className="font-['var(--font-playfair)'] font-semibold text-[#0F172A] text-lg lg:text-xl mb-3 lg:mb-4">
-          Spending by Member
-        </h3>
-        
+        <div className="flex items-center justify-between mb-3 lg:mb-4">
+          <h3 className="font-['var(--font-playfair)'] font-semibold text-[#0F172A] text-lg lg:text-xl">
+            Spending by Member
+          </h3>
+          {chartData.length > 0 && (
+            <span className="text-xs lg:text-sm font-['var(--font-dm-sans)'] text-[#94A3B8]">
+              Total {formatCurrency(chartData.reduce((s, d) => s + d.value, 0))}
+            </span>
+          )}
+        </div>
+
         {chartData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={280}>
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
-                outerRadius={90}
-                innerRadius={40}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {chartData.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip 
-                formatter={(value: any) => formatCurrency(value)}
-                contentStyle={{
-                  backgroundColor: 'white',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '12px',
-                  fontFamily: 'var(--font-dm-sans)',
-                  fontSize: '14px'
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+          <>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <defs>
+                  {COLORS.map((color, i) => (
+                    <linearGradient key={i} id={`memberGrad${i}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={color} stopOpacity={1} />
+                      <stop offset="100%" stopColor={color} stopOpacity={0.78} />
+                    </linearGradient>
+                  ))}
+                </defs>
+                <Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) =>
+                    (percent || 0) >= 0.06 ? `${((percent || 0) * 100).toFixed(0)}%` : ''
+                  }
+                  outerRadius={100}
+                  innerRadius={62}
+                  paddingAngle={3}
+                  cornerRadius={6}
+                  dataKey="value"
+                  stroke="#ffffff"
+                  strokeWidth={3}
+                  isAnimationActive
+                  animationDuration={800}
+                >
+                  {chartData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={`url(#memberGrad${index % COLORS.length})`} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(value: any) => formatCurrency(value)}
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: '12px',
+                    fontFamily: 'var(--font-dm-sans)',
+                    fontSize: '14px',
+                    boxShadow: '0 8px 24px rgba(15,23,42,0.10)',
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+
+            {/* Custom legend with amounts */}
+            <div className="grid grid-cols-2 gap-2 mt-3">
+              {chartData
+                .slice()
+                .sort((a, b) => b.value - a.value)
+                .map((entry) => {
+                  const total = chartData.reduce((s, d) => s + d.value, 0) || 1;
+                  return (
+                    <div key={entry.name} className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: COLORS[chartData.findIndex((d) => d.name === entry.name) % COLORS.length] }}
+                      />
+                      <span className="text-xs lg:text-sm text-[#475569] font-['var(--font-dm-sans)'] truncate">
+                        {entry.name}
+                      </span>
+                      <span className="text-xs lg:text-sm font-semibold text-[#0F172A] ml-auto whitespace-nowrap">
+                        {((entry.value / total) * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  );
+                })}
+            </div>
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center py-12 lg:py-16">
             <div className="w-24 h-24 lg:w-32 lg:h-32 rounded-full border-8 border-gray-200 mb-4"></div>
@@ -921,31 +1090,48 @@ export default function GroupSummary({
           <h3 className="font-['var(--font-playfair)'] font-semibold text-[#0F172A] text-lg lg:text-xl mb-3 lg:mb-4">
             Spending by Category
           </h3>
-          
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={categoryData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-              <XAxis 
-                dataKey="name" 
+
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={categoryData} margin={{ top: 16, right: 8, left: -8, bottom: 0 }}>
+              <defs>
+                <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10B981" stopOpacity={1} />
+                  <stop offset="100%" stopColor="#047857" stopOpacity={0.85} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#EEF2F6" vertical={false} />
+              <XAxis
+                dataKey="name"
                 tick={{ fill: '#475569', fontSize: 12 }}
                 axisLine={{ stroke: '#E2E8F0' }}
+                tickLine={false}
               />
-              <YAxis 
-                tick={{ fill: '#475569', fontSize: 12 }}
-                axisLine={{ stroke: '#E2E8F0' }}
-                tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`}
+              <YAxis
+                tick={{ fill: '#94A3B8', fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(value) => (value >= 1000 ? `₹${(value / 1000).toFixed(0)}k` : `₹${value}`)}
               />
-              <Tooltip 
+              <Tooltip
+                cursor={{ fill: 'rgba(16,185,129,0.06)' }}
                 formatter={(value: any) => formatCurrency(value)}
                 contentStyle={{
                   backgroundColor: 'white',
                   border: '1px solid #E2E8F0',
                   borderRadius: '12px',
                   fontFamily: 'var(--font-dm-sans)',
-                  fontSize: '14px'
+                  fontSize: '14px',
+                  boxShadow: '0 8px 24px rgba(15,23,42,0.10)',
                 }}
               />
-              <Bar dataKey="value" fill="#047857" radius={[8, 8, 0, 0]} />
+              <Bar
+                dataKey="value"
+                fill="url(#barGrad)"
+                radius={[10, 10, 0, 0]}
+                maxBarSize={64}
+                isAnimationActive
+                animationDuration={800}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>

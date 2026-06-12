@@ -21,6 +21,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { resolveDisplayName, getInitials } from '@/lib/display-name';
 
 interface DashboardNavProps {
   user: any;
@@ -54,18 +55,9 @@ export default function DashboardNav({ user, profile }: DashboardNavProps) {
     }
   };
 
-  const displayName =
-    profile?.full_name ||
-    user?.user_metadata?.full_name ||
-    user?.email?.split('@')[0] ||
-    'User';
+  const displayName = resolveDisplayName(user, profile);
 
-  const initials = displayName
-    ?.split(' ')
-    .map((n: string) => n[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase() || user.email[0].toUpperCase();
+  const initials = getInitials(displayName, user?.email);
 
   return (
     <>

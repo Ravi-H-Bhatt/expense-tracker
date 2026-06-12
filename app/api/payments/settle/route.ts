@@ -208,23 +208,37 @@ export async function POST(request: NextRequest) {
 
       console.log('✅ Settlement confirmed successfully:', updatedSettlement.id);
 
+      // Resolve the payee's display name first — we need it to scope which
+      // expenses this settlement actually covers.
+      const { data: payee } = await supabase
+        .from('group_members')
+        .select('display_name')
+        .eq('user_id', payeeId)
+        .eq('group_id', groupId)
+        .single();
+
+      const payeeName = payee?.display_name || 'Someone';
+
       // Mark related payment splits as settled.
-      // The PAYER is the debtor who owed money, so we settle the PAYER's
-      // unsettled splits — but ONLY for expenses belonging to THIS group.
-      const { data: groupExpenses } = await supabase
+      // The PAYER is the debtor who owed money. We settle the PAYER's
+      // unsettled splits — but ONLY for expenses in THIS group that were
+      // actually PAID BY the payee (the creditor confirming receipt).
+      // This prevents over-settling debts the payer owes to OTHER members.
+      const { data: payeeExpenses } = await supabase
         .from('group_expenses')
         .select('id')
-        .eq('group_id', groupId);
+        .eq('group_id', groupId)
+        .eq('paid_by_name', payeeName);
 
-      const groupExpenseIds = (groupExpenses || []).map(e => e.id);
+      const payeeExpenseIds = (payeeExpenses || []).map(e => e.id);
 
-      if (groupExpenseIds.length > 0) {
+      if (payeeExpenseIds.length > 0) {
         const { data: unresolvedSplits } = await supabase
           .from('expense_splits')
           .select('id, expense_id')
           .eq('user_id', payerId)
           .eq('is_settled', false)
-          .in('expense_id', groupExpenseIds);
+          .in('expense_id', payeeExpenseIds);
 
         if (unresolvedSplits && unresolvedSplits.length > 0) {
           await supabase
@@ -235,18 +249,13 @@ export async function POST(request: NextRequest) {
               settled_with_user_id: payeeId
             })
             .in('id', unresolvedSplits.map(s => s.id));
+          console.log(`✅ Settled ${unresolvedSplits.length} split(s) owed by payer to ${payeeName}`);
         }
+      } else {
+        console.log('ℹ️ No expenses paid by payee found to settle');
       }
 
       // Notify payer of confirmation
-      const { data: payee } = await supabase
-        .from('group_members')
-        .select('display_name')
-        .eq('user_id', payeeId)
-        .eq('group_id', groupId)
-        .single();
-
-      const payeeName = payee?.display_name || 'Someone';
 
       // Get payer's email for confirmation notification
       const { data: { user: payerUser }, error: payerError } = await adminClient.auth.admin.getUserById(payerId);

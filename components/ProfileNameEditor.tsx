@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { Edit2, Check, X } from 'lucide-react';
+import { resolveDisplayName } from '@/lib/display-name';
 
 interface ProfileNameEditorProps {
   user: any;
@@ -24,13 +26,10 @@ export default function ProfileNameEditor({
   const [originalName, setOriginalName] = useState('');
 
   const supabase = createClient();
+  const router = useRouter();
 
   useEffect(() => {
-    const currentName =
-      user?.profile?.full_name ||
-      user?.user_metadata?.full_name ||
-      user?.email?.split('@')[0] ||
-      'User';
+    const currentName = resolveDisplayName(user, user?.profile);
     setName(currentName);
     setOriginalName(currentName);
   }, [user]);
@@ -94,6 +93,8 @@ export default function ProfileNameEditor({
       setEditing(false);
       toast.success('Name updated successfully across all groups');
       onNameUpdated?.(name.trim());
+      // Refresh server components (e.g. the sidebar) so the new name shows everywhere
+      router.refresh();
     } catch (error) {
       console.error('Error saving name:', error);
       toast.error('Failed to save name. Try again.');

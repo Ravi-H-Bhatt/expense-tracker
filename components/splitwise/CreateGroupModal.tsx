@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { X, Copy, Check } from 'lucide-react';
+import { resolveDisplayName } from '@/lib/display-name';
 
 interface CreateGroupModalProps {
   onClose: () => void;
@@ -47,7 +48,7 @@ export default function CreateGroupModal({ onClose, onGroupCreated, currentUser 
       if (groupError) throw groupError;
 
       // Add creator as member
-      const displayName = currentUser.profile?.full_name || currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'User';
+      const displayName = resolveDisplayName(currentUser, currentUser?.profile);
       
       const { error: memberError } = await supabase
         .from('group_members')

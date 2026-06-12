@@ -9,6 +9,7 @@ import GroupSummary from './GroupSummary';
 import ExpenseConfirmCard from './ExpenseConfirmCard';
 import ManualExpenseModal from './ManualExpenseModal';
 import { buildEqualSplits, resolveNames, matchName, round2 } from '@/lib/split-math';
+import { resolveDisplayName } from '@/lib/display-name';
 
 interface GroupWorkspaceProps {
   groupId: string;
@@ -562,7 +563,7 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
 
     try {
       // Save user message to DB
-      const displayName = currentUser.profile?.full_name || currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'User';
+      const displayName = resolveDisplayName(currentUser, currentUser?.profile);
       
       await supabase.from('group_messages').insert({
         group_id: groupId,
@@ -725,7 +726,7 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
       }
 
       // Post expense log message
-      const displayName = currentUser.profile?.full_name || currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'User';
+      const displayName = resolveDisplayName(currentUser, currentUser?.profile);
       await supabase.from('group_messages').insert({
         group_id: groupId,
         user_id: currentUser.id,
