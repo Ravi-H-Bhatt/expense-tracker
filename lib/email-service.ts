@@ -77,7 +77,7 @@ export async function sendPaymentRequestEmail(
   debtorName: string,
   amount: number,
   groupName: string,
-  appUrl: string = 'https://rfin.app'
+  appUrl: string = 'https://expense-tracker-ravibhatt.vercel.app'
 ): Promise<boolean> {
   const html = `
     <!DOCTYPE html>
@@ -154,7 +154,7 @@ export async function sendSettlementConfirmationEmail(
   payeeName: string,
   amount: number,
   groupName: string,
-  appUrl: string = 'https://rfin.app'
+  appUrl: string = 'https://expense-tracker-ravibhatt.vercel.app'
 ): Promise<boolean> {
   const html = `
     <!DOCTYPE html>
@@ -225,7 +225,7 @@ export async function sendSettlementPendingEmail(
   payeeName: string,
   amount: number,
   groupName: string,
-  appUrl: string = 'https://rfin.app'
+  appUrl: string = 'https://expense-tracker-ravibhatt.vercel.app'
 ): Promise<boolean> {
   const html = `
     <!DOCTYPE html>

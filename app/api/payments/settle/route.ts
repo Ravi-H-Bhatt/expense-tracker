@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { sendSettlementPendingEmail, sendSettlementConfirmationEmail } from '@/lib/email-service';
+import { resolveAppUrl } from '@/lib/app-url';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
@@ -124,7 +125,7 @@ export async function POST(request: NextRequest) {
           .single();
 
         const payeeName = payeeMember?.display_name || 'User';
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const appUrl = resolveAppUrl(request);
         
         console.log('📧 Payee Name:', payeeName);
         console.log('📧 App URL:', appUrl);
@@ -294,7 +295,7 @@ export async function POST(request: NextRequest) {
           .single();
 
         const payerName = payerMember?.display_name || 'User';
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const appUrl = resolveAppUrl(request);
         
         console.log('📧 Payer Name:', payerName);
         console.log('📧 App URL:', appUrl);

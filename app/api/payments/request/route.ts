@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { sendPaymentRequestEmail } from '@/lib/email-service';
+import { resolveAppUrl } from '@/lib/app-url';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
     console.log('📧 Sending payment request to', debtorEmail);
 
     // Send email notification and report the REAL result back to the client
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const appUrl = resolveAppUrl(request);
 
     let emailSent = false;
     let emailError: string | null = null;
