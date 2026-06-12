@@ -32,7 +32,7 @@ export default function SignupPage() {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -44,7 +44,26 @@ export default function SignupPage() {
 
       if (error) throw error;
 
-      toast.success('Check your email to confirm your account!');
+      // If email confirmation is OFF in Supabase, signUp returns a session and
+      // the user is logged in immediately — send them straight to the dashboard.
+      if (data.session) {
+        toast.success('Account created! Welcome to RFin.');
+        window.location.assign('/dashboard');
+        return;
+      }
+
+      // Otherwise try to sign them in right away (works when confirmation is off
+      // but no session was returned). If that fails, confirmation is required.
+      const { data: signInData, error: signInError } =
+        await supabase.auth.signInWithPassword({ email, password });
+
+      if (!signInError && signInData.session) {
+        toast.success('Account created! Welcome to RFin.');
+        window.location.assign('/dashboard');
+        return;
+      }
+
+      toast.success('Account created! Please check your email to confirm, then sign in.');
       router.push('/auth/login');
     } catch (error: any) {
       toast.error(error.message || 'Failed to sign up');
@@ -56,10 +75,12 @@ export default function SignupPage() {
   const handleGoogleSignup = async () => {
     setIsLoading(true);
     try {
+      const callbackUrl = new URL('/auth/callback', window.location.origin);
+      callbackUrl.searchParams.set('next', '/dashboard');
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: callbackUrl.toString(),
         },
       });
 
