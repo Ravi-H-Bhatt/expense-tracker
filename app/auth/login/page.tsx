@@ -59,13 +59,12 @@ function LoginForm() {
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
-      const returnTo = searchParams?.get('returnTo') || '/dashboard';
-      const callbackUrl = new URL('/auth/callback', window.location.origin);
-      callbackUrl.searchParams.set('next', returnTo);
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: callbackUrl.toString(),
+          // Must EXACTLY match a URL in Supabase's Redirect URLs allowlist.
+          // Keep it clean (no query string) so Supabase doesn't fall back to Site URL.
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
