@@ -1,13 +1,9 @@
 -- Fix Display Name Sync (idempotent — safe to run multiple times)
 -- Run this in Supabase SQL Editor.
 --
--- Order matters:
---   1) Enable realtime on group_members (live name updates)
---   2) Backfill profiles.full_name FROM auth.users metadata (the real source)
---   3) Backfill group_members.display_name FROM profiles
---
--- This fixes rows still showing "User" because the name only lived in auth
--- metadata and never reached the profiles / group_members tables.
+-- Root cause: the signup trigger saved profiles.full_name = 'User' when the
+-- name metadata was empty at signup. This backfills the REAL name from
+-- auth.users metadata into profiles, then into group_members.
 
 -- 1) Enable realtime on group_members ONLY if not already enabled.
 DO $$
@@ -26,35 +22,35 @@ BEGIN
 END $$;
 
 -- 2) Backfill profiles.full_name from auth.users metadata.
---    Looks at full_name, then name (Google OAuth sometimes uses `name`).
-INSERT INTO profiles (id, email, full_name, updated_at)
-SELECT
-  u.id,
-  u.email,
-  COALESCE(
-    NULLIF(u.raw_user_meta_data->>'full_name', ''),
-    NULLIF(u.raw_user_meta_data->>'name', '')
-  ) AS full_name,
-  now()
+--    Overwrites empty OR the literal placeholder 'User' with the real name.
+UPDATE profiles p
+SET full_name = COALESCE(
+      NULLIF(u.raw_user_meta_data->>'full_name', ''),
+      NULLIF(u.raw_user_meta_data->>'name', '')
+    ),
+    updated_at = now()
 FROM auth.users u
-WHERE COALESCE(
+WHERE u.id = p.id
+  AND COALESCE(
         NULLIF(u.raw_user_meta_data->>'full_name', ''),
         NULLIF(u.raw_user_meta_data->>'name', '')
       ) IS NOT NULL
-ON CONFLICT (id) DO UPDATE
-SET full_name = COALESCE(NULLIF(EXCLUDED.full_name, ''), profiles.full_name),
-    updated_at = now();
+  AND (p.full_name IS NULL OR p.full_name = '' OR p.full_name = 'User');
 
--- 3) Backfill group_members.display_name from profiles where stale/different.
+-- 3) Backfill group_members.display_name from profiles where stale.
 UPDATE group_members gm
 SET display_name = p.full_name
 FROM profiles p
 WHERE p.id = gm.user_id
   AND p.full_name IS NOT NULL
   AND p.full_name <> ''
+  AND p.full_name <> 'User'
   AND p.full_name <> gm.display_name;
 
--- Verify: see resolved names
-SELECT gm.user_id, gm.display_name, p.full_name AS profile_name
+-- 4) Verify
+SELECT gm.user_id, gm.display_name, p.full_name AS profile_name,
+       u.raw_user_meta_data->>'full_name' AS meta_full_name,
+       u.raw_user_meta_data->>'name'      AS meta_name
 FROM group_members gm
-LEFT JOIN profiles p ON p.id = gm.user_id;
+LEFT JOIN profiles p ON p.id = gm.user_id
+LEFT JOIN auth.users u ON u.id = gm.user_id;

@@ -46,8 +46,9 @@ function LoginForm() {
 
       toast.success('Welcome back!');
       const returnTo = searchParams?.get('returnTo') || '/dashboard';
-      router.push(returnTo);
-      router.refresh();
+      // Hard navigation so the server-side middleware immediately sees the
+      // freshly-set auth cookie (avoids bouncing back to the login page).
+      window.location.assign(returnTo);
     } catch (error: any) {
       toast.error(error.message || 'Failed to sign in');
     } finally {
@@ -58,10 +59,13 @@ function LoginForm() {
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
+      const returnTo = searchParams?.get('returnTo') || '/dashboard';
+      const callbackUrl = new URL('/auth/callback', window.location.origin);
+      callbackUrl.searchParams.set('next', returnTo);
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: callbackUrl.toString(),
         },
       });
 

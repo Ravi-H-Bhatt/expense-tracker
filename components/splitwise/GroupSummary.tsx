@@ -228,7 +228,8 @@ export default function GroupSummary({
 
     setIsRemindingAll(true);
     const requesterName =
-      currentUser.profile?.full_name || currentUser.email?.split('@')[0] || 'Someone';
+      members.find(m => m.user_id === currentUser.id)?.display_name
+      || resolveDisplayName(currentUser, currentUser?.profile);
 
     let emailed = 0;
     let notified = 0;

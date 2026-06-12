@@ -9,11 +9,20 @@
  *  5. "User" as a last resort
  */
 export function resolveDisplayName(user: any, profile?: any): string {
-  const fromProfile = (profile?.full_name || user?.profile?.full_name || '').trim();
+  // Treat the literal placeholder "User" (saved by the old signup trigger)
+  // as if it were empty, so a real name from another source wins.
+  const clean = (v: any): string => {
+    const s = String(v ?? '').trim();
+    if (!s) return '';
+    if (s.toLowerCase() === 'user') return '';
+    return s;
+  };
+
+  const fromProfile = clean(profile?.full_name) || clean(user?.profile?.full_name);
   if (fromProfile) return fromProfile;
 
   const meta = user?.user_metadata || {};
-  const fromMeta = (meta.full_name || meta.name || meta.display_name || '').trim();
+  const fromMeta = clean(meta.full_name) || clean(meta.name) || clean(meta.display_name);
   if (fromMeta) return fromMeta;
 
   const email: string = user?.email || '';
