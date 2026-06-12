@@ -207,22 +207,34 @@ export async function POST(request: NextRequest) {
 
       console.log('✅ Settlement confirmed successfully:', updatedSettlement.id);
 
-      // Mark related payment splits as settled
-      const { data: unresolvedSplits } = await supabase
-        .from('expense_splits')
-        .select('id, expense_id')
-        .eq('user_id', payeeId)
-        .eq('is_settled', false);
+      // Mark related payment splits as settled.
+      // The PAYER is the debtor who owed money, so we settle the PAYER's
+      // unsettled splits — but ONLY for expenses belonging to THIS group.
+      const { data: groupExpenses } = await supabase
+        .from('group_expenses')
+        .select('id')
+        .eq('group_id', groupId);
 
-      if (unresolvedSplits && unresolvedSplits.length > 0) {
-        await supabase
+      const groupExpenseIds = (groupExpenses || []).map(e => e.id);
+
+      if (groupExpenseIds.length > 0) {
+        const { data: unresolvedSplits } = await supabase
           .from('expense_splits')
-          .update({
-            is_settled: true,
-            settled_at: new Date().toISOString(),
-            settled_with_user_id: payerId
-          })
-          .in('id', unresolvedSplits.map(s => s.id));
+          .select('id, expense_id')
+          .eq('user_id', payerId)
+          .eq('is_settled', false)
+          .in('expense_id', groupExpenseIds);
+
+        if (unresolvedSplits && unresolvedSplits.length > 0) {
+          await supabase
+            .from('expense_splits')
+            .update({
+              is_settled: true,
+              settled_at: new Date().toISOString(),
+              settled_with_user_id: payeeId
+            })
+            .in('id', unresolvedSplits.map(s => s.id));
+        }
       }
 
       // Notify payer of confirmation

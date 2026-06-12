@@ -49,73 +49,74 @@
 }
 
 :root {
-  /* Luxury Beige Finance Theme */
-  --background: oklch(0.97 0.015 60);
-  --foreground: oklch(0.25 0.02 40);
-  --card: oklch(0.98 0.012 55);
-  --card-foreground: oklch(0.25 0.02 40);
-  --popover: oklch(0.97 0.015 60);
-  --popover-foreground: oklch(0.25 0.02 40);
-  --primary: oklch(0.52 0.08 45);
-  --primary-foreground: oklch(0.98 0.012 55);
-  --secondary: oklch(0.92 0.02 50);
-  --secondary-foreground: oklch(0.25 0.02 40);
-  --muted: oklch(0.92 0.02 50);
-  --muted-foreground: oklch(0.50 0.015 45);
-  --accent: oklch(0.88 0.03 48);
-  --accent-foreground: oklch(0.25 0.02 40);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.88 0.02 52);
-  --input: oklch(0.88 0.02 52);
-  --ring: oklch(0.52 0.08 45);
-  --chart-1: oklch(0.60 0.12 45);
-  --chart-2: oklch(0.60 0.10 220);
-  --chart-3: oklch(0.55 0.09 280);
-  --chart-4: oklch(0.58 0.11 140);
-  --chart-5: oklch(0.62 0.13 20);
-  --radius: 0.75rem;
-  --sidebar: oklch(0.98 0.012 55);
-  --sidebar-foreground: oklch(0.25 0.02 40);
-  --sidebar-primary: oklch(0.52 0.08 45);
-  --sidebar-primary-foreground: oklch(0.98 0.012 55);
-  --sidebar-accent: oklch(0.92 0.02 50);
-  --sidebar-accent-foreground: oklch(0.25 0.02 40);
-  --sidebar-border: oklch(0.88 0.02 52);
-  --sidebar-ring: oklch(0.52 0.08 45);
+  /* Modern Fintech Theme — cool light base, deep navy ink, emerald money-accent */
+  --background: oklch(0.985 0.004 240);
+  --foreground: oklch(0.21 0.035 255);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.035 255);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.035 255);
+  --primary: oklch(0.58 0.13 162);
+  --primary-foreground: oklch(0.99 0.01 160);
+  --secondary: oklch(0.96 0.01 240);
+  --secondary-foreground: oklch(0.21 0.035 255);
+  --muted: oklch(0.96 0.008 240);
+  --muted-foreground: oklch(0.50 0.02 250);
+  --accent: oklch(0.93 0.04 165);
+  --accent-foreground: oklch(0.24 0.05 165);
+  --destructive: oklch(0.58 0.22 25);
+  --border: oklch(0.91 0.01 245);
+  --input: oklch(0.91 0.01 245);
+  --ring: oklch(0.58 0.13 162);
+  --chart-1: oklch(0.58 0.13 162);
+  --chart-2: oklch(0.55 0.13 240);
+  --chart-3: oklch(0.62 0.15 290);
+  --chart-4: oklch(0.70 0.15 80);
+  --chart-5: oklch(0.62 0.18 30);
+  --radius: 0.85rem;
+  --sidebar: oklch(0.21 0.035 255);
+  --sidebar-foreground: oklch(0.92 0.01 240);
+  --sidebar-primary: oklch(0.58 0.13 162);
+  --sidebar-primary-foreground: oklch(0.99 0.01 160);
+  --sidebar-accent: oklch(0.28 0.04 255);
+  --sidebar-accent-foreground: oklch(0.96 0.01 160);
+  --sidebar-border: oklch(0.30 0.035 255);
+  --sidebar-ring: oklch(0.58 0.13 162);
 }
 
 .dark {
-  --background: oklch(0.10 0.015 30);
-  --foreground: oklch(0.95 0.008 55);
-  --card: oklch(0.14 0.018 32);
-  --card-foreground: oklch(0.95 0.008 55);
-  --popover: oklch(0.10 0.015 30);
-  --popover-foreground: oklch(0.95 0.008 55);
-  --primary: oklch(0.60 0.10 48);
-  --primary-foreground: oklch(0.10 0.015 30);
-  --secondary: oklch(0.20 0.020 35);
-  --secondary-foreground: oklch(0.95 0.008 55);
-  --muted: oklch(0.20 0.020 35);
-  --muted-foreground: oklch(0.65 0.012 48);
-  --accent: oklch(0.24 0.025 38);
-  --accent-foreground: oklch(0.95 0.008 55);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(0.25 0.022 35);
-  --input: oklch(0.25 0.022 35);
-  --ring: oklch(0.60 0.10 48);
-  --chart-1: oklch(0.65 0.12 50);
-  --chart-2: oklch(0.65 0.10 220);
-  --chart-3: oklch(0.62 0.09 280);
-  --chart-4: oklch(0.64 0.11 140);
-  --chart-5: oklch(0.67 0.13 25);
-  --sidebar: oklch(0.14 0.018 32);
-  --sidebar-foreground: oklch(0.95 0.008 55);
-  --sidebar-primary: oklch(0.60 0.10 48);
-  --sidebar-primary-foreground: oklch(0.95 0.008 55);
-  --sidebar-accent: oklch(0.20 0.020 35);
-  --sidebar-accent-foreground: oklch(0.95 0.008 55);
-  --sidebar-border: oklch(0.25 0.022 35);
-  --sidebar-ring: oklch(0.60 0.10 48);
+  /* Midnight navy with emerald accent */
+  --background: oklch(0.17 0.03 255);
+  --foreground: oklch(0.95 0.01 240);
+  --card: oklch(0.21 0.035 255);
+  --card-foreground: oklch(0.95 0.01 240);
+  --popover: oklch(0.21 0.035 255);
+  --popover-foreground: oklch(0.95 0.01 240);
+  --primary: oklch(0.64 0.14 162);
+  --primary-foreground: oklch(0.15 0.03 255);
+  --secondary: oklch(0.26 0.035 255);
+  --secondary-foreground: oklch(0.95 0.01 240);
+  --muted: oklch(0.26 0.035 255);
+  --muted-foreground: oklch(0.68 0.02 245);
+  --accent: oklch(0.30 0.05 165);
+  --accent-foreground: oklch(0.95 0.01 160);
+  --destructive: oklch(0.65 0.20 25);
+  --border: oklch(0.30 0.035 255);
+  --input: oklch(0.30 0.035 255);
+  --ring: oklch(0.64 0.14 162);
+  --chart-1: oklch(0.64 0.14 162);
+  --chart-2: oklch(0.60 0.13 240);
+  --chart-3: oklch(0.66 0.15 290);
+  --chart-4: oklch(0.74 0.15 80);
+  --chart-5: oklch(0.66 0.18 30);
+  --sidebar: oklch(0.15 0.03 255);
+  --sidebar-foreground: oklch(0.92 0.01 240);
+  --sidebar-primary: oklch(0.64 0.14 162);
+  --sidebar-primary-foreground: oklch(0.15 0.03 255);
+  --sidebar-accent: oklch(0.24 0.04 255);
+  --sidebar-accent-foreground: oklch(0.96 0.01 160);
+  --sidebar-border: oklch(0.28 0.035 255);
+  --sidebar-ring: oklch(0.64 0.14 162);
 }
 
 @layer base {
@@ -153,6 +154,122 @@
     );
     background-size: 200% 100%;
   }
+
+  /* Entrance animations */
+  .animate-fade-in-up {
+    animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease-out both;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Staggered children: add .stagger to a parent, children animate in sequence */
+  .stagger > * {
+    animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .stagger > *:nth-child(1) { animation-delay: 0.04s; }
+  .stagger > *:nth-child(2) { animation-delay: 0.08s; }
+  .stagger > *:nth-child(3) { animation-delay: 0.12s; }
+  .stagger > *:nth-child(4) { animation-delay: 0.16s; }
+  .stagger > *:nth-child(5) { animation-delay: 0.20s; }
+  .stagger > *:nth-child(6) { animation-delay: 0.24s; }
+  .stagger > *:nth-child(7) { animation-delay: 0.28s; }
+  .stagger > *:nth-child(8) { animation-delay: 0.32s; }
+
+  /* Subtle lift on hover for cards */
+  .hover-lift {
+    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .hover-lift:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px -12px oklch(0.52 0.08 45 / 0.35);
+  }
+
+  /* Tactile press feedback for buttons */
+  .press {
+    transition: transform 0.12s ease, filter 0.2s ease, background-color 0.2s ease;
+  }
+  .press:active {
+    transform: scale(0.97);
+  }
+
+  /* ---- Fintech flavour ---- */
+
+  /* Emerald money gradient for headline numbers */
+  .text-money {
+    background: linear-gradient(135deg, oklch(0.62 0.15 162), oklch(0.55 0.13 200));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Premium deep-navy hero gradient */
+  .bg-finance-hero {
+    background:
+      radial-gradient(1200px 600px at 80% -10%, oklch(0.34 0.09 165 / 0.55), transparent 60%),
+      radial-gradient(900px 500px at 0% 10%, oklch(0.30 0.08 250 / 0.55), transparent 55%),
+      linear-gradient(160deg, oklch(0.19 0.035 255), oklch(0.15 0.03 255));
+  }
+
+  /* Subtle moving grid (financial graph paper) */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, oklch(1 0 0 / 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, oklch(1 0 0 / 0.05) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Animated emerald aurora blob */
+  .aurora {
+    animation: aurora 14s ease-in-out infinite;
+    filter: blur(40px);
+  }
+
+  .float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  /* Shiny sweep for premium CTAs */
+  .sheen {
+    position: relative;
+    overflow: hidden;
+  }
+  .sheen::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -150%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(120deg, transparent, oklch(1 0 0 / 0.35), transparent);
+    transform: skewX(-20deg);
+    animation: sheen 4.5s ease-in-out infinite;
+  }
+
+  /* Gradient ring/border for KPI cards */
+  .ring-gradient {
+    position: relative;
+    background: var(--card);
+    border-radius: 1rem;
+  }
+  .ring-gradient::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, oklch(0.64 0.14 162 / 0.6), transparent 50%, oklch(0.55 0.13 240 / 0.5));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
 }
 
 @keyframes shimmer {
@@ -161,5 +278,65 @@
   }
   100% {
     background-position: 200% 0;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes aurora {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.7; }
+  33% { transform: translate(30px, -20px) scale(1.1); opacity: 0.9; }
+  66% { transform: translate(-20px, 20px) scale(0.95); opacity: 0.6; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes sheen {
+  0% { left: -150%; }
+  40%, 100% { left: 150%; }
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up,
+  .animate-fade-in,
+  .animate-scale-in,
+  .stagger > *,
+  .animate-shimmer,
+  .aurora,
+  .float,
+  .sheen::after {
+    animation: none !important;
+  }
+  .hover-lift:hover {
+    transform: none;
   }
 }

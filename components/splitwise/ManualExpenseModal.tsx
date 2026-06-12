@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { X, Trash2 } from 'lucide-react';
+import { buildEqualSplits, validateCustomSplits, round2, splitEqually } from '@/lib/split-math';
 
 interface ManualExpenseModalProps {
   onClose: () => void;
@@ -49,6 +50,8 @@ export default function ManualExpenseModal({
         setPaidBy(currentMember.display_name);
       }
     }
+    // Default: everyone is included in an equal split
+    setSelectedMembers(members.map(m => m.display_name));
   }, [existingExpense, members, currentUser]);
 
   const handleMemberToggle = (memberName: string) => {
@@ -78,11 +81,9 @@ export default function ManualExpenseModal({
 
     if (splitType === 'equal') {
       const membersToSplit = selectedMembers.length > 0 ? selectedMembers : members.map(m => m.display_name);
-      const splitAmount = amount / membersToSplit.length;
-      return membersToSplit.map(name => ({
-        name,
-        amount: splitAmount
-      }));
+      if (membersToSplit.length === 0) return [];
+      // Rounding-safe equal split: parts always sum exactly to the total
+      return buildEqualSplits(amount, membersToSplit);
     }
 
     // Manual splits
@@ -90,7 +91,7 @@ export default function ManualExpenseModal({
       .filter(([_, amt]) => parseFloat(amt) > 0)
       .map(([name, amt]) => ({
         name,
-        amount: parseFloat(amt)
+        amount: round2(parseFloat(amt))
       }));
   };
 
@@ -104,10 +105,10 @@ export default function ManualExpenseModal({
     }
 
     if (splitType === 'manual') {
-      const totalSplit = splits.reduce((sum, s) => sum + s.amount, 0);
       const amount = parseFloat(totalAmount);
-      if (Math.abs(totalSplit - amount) > 0.01) {
-        toast.error(`Splits must add up to ₹${amount}. Currently: ₹${totalSplit.toFixed(2)}`);
+      const { ok, sum } = validateCustomSplits(amount, splits.map(s => s.amount));
+      if (!ok) {
+        toast.error(`Splits must add up to ₹${amount.toFixed(2)}. Currently: ₹${sum.toFixed(2)}`);
         return false;
       }
     }
@@ -275,10 +276,10 @@ export default function ManualExpenseModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-[#FAF7F2] rounded-2xl max-w-2xl w-full shadow-2xl my-8 max-h-[90vh] overflow-y-auto">
+      <div className="bg-[#F8FAFC] rounded-2xl max-w-2xl w-full shadow-2xl my-8 max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 lg:px-6 py-4 border-b border-[#E8DDD0] sticky top-0 bg-[#FAF7F2] z-10">
-          <h2 className="text-xl lg:text-2xl font-['var(--font-playfair)'] font-semibold text-[#1A1208]">
+        <div className="flex items-center justify-between px-4 lg:px-6 py-4 border-b border-[#E2E8F0] sticky top-0 bg-[#F8FAFC] z-10">
+          <h2 className="text-xl lg:text-2xl font-['var(--font-playfair)'] font-semibold text-[#0F172A]">
             {existingExpense ? 'Edit Expense' : 'Add Expense'}
           </h2>
           <div className="flex items-center gap-2">
@@ -294,7 +295,7 @@ export default function ManualExpenseModal({
             )}
             <button
               onClick={onClose}
-              className="text-[#6B5744] hover:text-[#1A1208] transition-colors"
+              className="text-[#475569] hover:text-[#0F172A] transition-colors"
             >
               <X className="w-6 h-6" />
             </button>
@@ -305,7 +306,7 @@ export default function ManualExpenseModal({
         <form onSubmit={handleSubmit} className="px-4 lg:px-6 py-6 space-y-5">
           {/* Description */}
           <div>
-            <label className="block text-sm font-['var(--font-dm-sans)'] font-semibold text-[#6B5744] mb-2">
+            <label className="block text-sm font-['var(--font-dm-sans)'] font-semibold text-[#475569] mb-2">
               Description *
             </label>
             <input
@@ -313,14 +314,14 @@ export default function ManualExpenseModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="e.g., Dinner at restaurant"
-              className="w-full border border-[#E8DDD0] rounded-xl px-4 py-3 bg-white placeholder:text-[#A89880] text-[#1A1208] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#D4956A]"
+              className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white placeholder:text-[#94A3B8] text-[#0F172A] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#10B981]"
               required
             />
           </div>
 
           {/* Amount */}
           <div>
-            <label className="block text-sm font-['var(--font-dm-sans)'] font-semibold text-[#6B5744] mb-2">
+            <label className="block text-sm font-['var(--font-dm-sans)'] font-semibold text-[#475569] mb-2">
               Total Amount (₹) *
             </label>
             <input
@@ -330,14 +331,14 @@ export default function ManualExpenseModal({
               placeholder="0"
               min="0"
               step="0.01"
-              className="w-full border border-[#E8DDD0] rounded-xl px-4 py-3 bg-white placeholder:text-[#A89880] text-[#1A1208] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#D4956A]"
+              className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white placeholder:text-[#94A3B8] text-[#0F172A] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#10B981]"
               required
             />
           </div>
 
           {/* Split Type */}
           <div>
-            <label className="block text-sm font-['var(--font-dm-sans)'] font-semibold text-[#6B5744] mb-2">
+            <label className="block text-sm font-['var(--font-dm-sans)'] font-semibold text-[#475569] mb-2">
               Split Type *
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -346,8 +347,8 @@ export default function ManualExpenseModal({
                 onClick={() => setSplitType('equal')}
                 className={`px-4 py-3 rounded-xl font-['var(--font-dm-sans)'] font-medium transition-all ${
                   splitType === 'equal'
-                    ? 'bg-[#8B4513] text-white'
-                    : 'bg-white border border-[#E8DDD0] text-[#6B5744] hover:border-[#8B4513]'
+                    ? 'bg-[#047857] text-white'
+                    : 'bg-white border border-[#E2E8F0] text-[#475569] hover:border-[#047857]'
                 }`}
               >
                 Split Equally
@@ -357,8 +358,8 @@ export default function ManualExpenseModal({
                 onClick={() => setSplitType('manual')}
                 className={`px-4 py-3 rounded-xl font-['var(--font-dm-sans)'] font-medium transition-all ${
                   splitType === 'manual'
-                    ? 'bg-[#8B4513] text-white'
-                    : 'bg-white border border-[#E8DDD0] text-[#6B5744] hover:border-[#8B4513]'
+                    ? 'bg-[#047857] text-white'
+                    : 'bg-white border border-[#E2E8F0] text-[#475569] hover:border-[#047857]'
                 }`}
               >
                 Custom Split
@@ -368,8 +369,8 @@ export default function ManualExpenseModal({
                 onClick={() => setSplitType('groupfund')}
                 className={`px-4 py-3 rounded-xl font-['var(--font-dm-sans)'] font-medium transition-all ${
                   splitType === 'groupfund'
-                    ? 'bg-[#8B4513] text-white'
-                    : 'bg-white border border-[#E8DDD0] text-[#6B5744] hover:border-[#8B4513]'
+                    ? 'bg-[#047857] text-white'
+                    : 'bg-white border border-[#E2E8F0] text-[#475569] hover:border-[#047857]'
                 }`}
               >
                 📦 Group Fund
@@ -380,13 +381,13 @@ export default function ManualExpenseModal({
           {/* Paid By (if not group fund) */}
           {splitType !== 'groupfund' && (
             <div>
-              <label className="block text-sm font-['var(--font-dm-sans)'] font-semibold text-[#6B5744] mb-2">
+              <label className="block text-sm font-['var(--font-dm-sans)'] font-semibold text-[#475569] mb-2">
                 Paid By *
               </label>
               <select
                 value={paidBy}
                 onChange={(e) => setPaidBy(e.target.value)}
-                className="w-full border border-[#E8DDD0] rounded-xl px-4 py-3 bg-white text-[#1A1208] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#D4956A]"
+                className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white text-[#0F172A] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#10B981]"
                 required
               >
                 <option value="">Select who paid</option>
@@ -402,10 +403,10 @@ export default function ManualExpenseModal({
           {/* Member Selection & Splits */}
           {splitType !== 'groupfund' && (
             <div>
-              <label className="block text-sm font-['var(--font-dm-sans)'] font-semibold text-[#6B5744] mb-2">
+              <label className="block text-sm font-['var(--font-dm-sans)'] font-semibold text-[#475569] mb-2">
                 {splitType === 'equal' ? 'Split With (select members)' : 'Enter Custom Amounts'}
               </label>
-              <div className="bg-white rounded-xl border border-[#E8DDD0] p-4 space-y-3 max-h-64 overflow-y-auto">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 space-y-3 max-h-64 overflow-y-auto">
                 {members.map((member) => (
                   <div key={member.id} className="flex items-center justify-between gap-3">
                     <label className="flex items-center gap-3 flex-1 cursor-pointer">
@@ -414,13 +415,13 @@ export default function ManualExpenseModal({
                         checked={splitType === 'equal' ? selectedMembers.includes(member.display_name) : true}
                         onChange={() => splitType === 'equal' && handleMemberToggle(member.display_name)}
                         disabled={splitType === 'manual'}
-                        className="w-5 h-5 rounded border-[#E8DDD0] text-[#8B4513] focus:ring-[#D4956A]"
+                        className="w-5 h-5 rounded border-[#E2E8F0] text-[#047857] focus:ring-[#10B981]"
                       />
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-[#8B4513] text-white flex items-center justify-center text-sm font-semibold">
+                        <div className="w-8 h-8 rounded-full bg-[#047857] text-white flex items-center justify-center text-sm font-semibold">
                           {member.display_name[0].toUpperCase()}
                         </div>
-                        <span className="font-['var(--font-dm-sans)'] text-[#1A1208]">
+                        <span className="font-['var(--font-dm-sans)'] text-[#0F172A]">
                           {member.display_name}
                         </span>
                       </div>
@@ -434,13 +435,19 @@ export default function ManualExpenseModal({
                         placeholder="0"
                         min="0"
                         step="0.01"
-                        className="w-24 border border-[#E8DDD0] rounded-lg px-3 py-2 text-right text-[#1A1208] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#D4956A]"
+                        className="w-24 border border-[#E2E8F0] rounded-lg px-3 py-2 text-right text-[#0F172A] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#10B981]"
                       />
                     ) : (
-                      <span className="text-sm text-[#6B5744] font-['var(--font-dm-sans)'] w-24 text-right">
-                        {selectedMembers.includes(member.display_name) || (selectedMembers.length === 0 && parseFloat(totalAmount) > 0)
-                          ? `₹${(parseFloat(totalAmount) / (selectedMembers.length || members.length)).toFixed(2)}`
-                          : '—'}
+                      <span className="text-sm text-[#475569] font-['var(--font-dm-sans)'] w-24 text-right">
+                        {(() => {
+                          const amt = parseFloat(totalAmount);
+                          if (!selectedMembers.includes(member.display_name) || isNaN(amt) || amt <= 0) {
+                            return '—';
+                          }
+                          const idx = selectedMembers.indexOf(member.display_name);
+                          const parts = splitEqually(amt, selectedMembers.length);
+                          return `₹${parts[idx].toFixed(2)}`;
+                        })()}
                       </span>
                     )}
                   </div>
@@ -449,7 +456,7 @@ export default function ManualExpenseModal({
               
               {splitType === 'manual' && totalAmount && (
                 <div className="mt-2 flex justify-between text-sm font-['var(--font-dm-sans)']">
-                  <span className="text-[#6B5744]">Total split:</span>
+                  <span className="text-[#475569]">Total split:</span>
                   <span className={`font-semibold ${
                     Math.abs(manualSplitsTotal - parseFloat(totalAmount)) < 0.01
                       ? 'text-green-600'
@@ -464,8 +471,8 @@ export default function ManualExpenseModal({
 
           {/* Group Fund Warning */}
           {splitType === 'groupfund' && (
-            <div className="bg-[#FFF3CD] border border-[#F0C040] rounded-xl p-4">
-              <p className="text-sm font-['var(--font-dm-sans)'] text-[#8B4513]">
+            <div className="bg-[#ECFDF5] border border-[#A7F3D0] rounded-xl p-4">
+              <p className="text-sm font-['var(--font-dm-sans)'] text-[#047857]">
                 This expense will be deducted from the group fund (Current: ₹{group.group_fund || 0})
               </p>
             </div>
@@ -477,14 +484,14 @@ export default function ManualExpenseModal({
               type="button"
               onClick={onClose}
               disabled={isSaving || isDeleting}
-              className="flex-1 bg-white border-2 border-[#E8DDD0] text-[#6B5744] rounded-xl py-3 px-4 font-['var(--font-dm-sans)'] font-semibold hover:bg-[#F5EFE6] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 bg-white border-2 border-[#E2E8F0] text-[#475569] rounded-xl py-3 px-4 font-['var(--font-dm-sans)'] font-semibold hover:bg-[#F1F5F9] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving || isDeleting}
-              className="flex-1 bg-[#8B4513] text-white rounded-xl py-3 px-4 font-['var(--font-dm-sans)'] font-semibold hover:bg-[#6B3410] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 bg-[#047857] text-white rounded-xl py-3 px-4 font-['var(--font-dm-sans)'] font-semibold hover:bg-[#065F46] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? 'Saving...' : existingExpense ? 'Update Expense' : 'Add Expense'}
             </button>

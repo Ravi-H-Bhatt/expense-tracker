@@ -1,16 +1,16 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-// Brand colors
+// Brand colors — emerald/teal/navy fintech palette
 const COLORS = {
-  primary: [139, 69, 19] as [number, number, number],
-  secondary: [212, 149, 106] as [number, number, number],
-  accent: [240, 192, 112] as [number, number, number],
-  bg: [255, 243, 205] as [number, number, number],
-  text: [26, 18, 8] as [number, number, number],
-  textLight: [107, 87, 68] as [number, number, number],
-  success: [34, 197, 94] as [number, number, number],
-  danger: [239, 68, 68] as [number, number, number],
+  primary: [4, 120, 87] as [number, number, number],      // emerald-700
+  secondary: [16, 185, 129] as [number, number, number],  // emerald-500
+  accent: [14, 165, 233] as [number, number, number],     // sky-500
+  bg: [236, 253, 245] as [number, number, number],        // emerald-50
+  text: [15, 23, 42] as [number, number, number],         // slate-900
+  textLight: [71, 85, 105] as [number, number, number],   // slate-600
+  success: [5, 150, 105] as [number, number, number],     // emerald-600
+  danger: [225, 29, 72] as [number, number, number],      // rose-600
   white: [255, 255, 255] as [number, number, number]
 };
 
@@ -95,14 +95,18 @@ export class EnhancedPDFGenerator {
   }
 
   // Draw section header
-  private drawSectionHeader(title: string, icon: string = '📊') {
+  private drawSectionHeader(title: string) {
     this.checkPageBreak(20);
 
-    // Title with icon
+    // Accent tab
+    this.doc.setFillColor(...COLORS.primary);
+    this.doc.roundedRect(this.margin, this.currentY - 1, 3, 7, 1, 1, 'F');
+
+    // Title
     this.doc.setFontSize(14);
     this.doc.setFont('helvetica', 'bold');
     this.doc.setTextColor(...COLORS.text);
-    this.doc.text(`${icon} ${title}`, this.margin, this.currentY + 5);
+    this.doc.text(title, this.margin + 6, this.currentY + 5);
 
     // Underline
     this.doc.setDrawColor(...COLORS.secondary);
@@ -180,19 +184,19 @@ export class EnhancedPDFGenerator {
   // Draw mini chart (text-based)
   private drawMiniBarChart(data: { label: string; value: number; max: number }[], title: string) {
     this.checkPageBreak(60);
-    this.drawSectionHeader(title, '📈');
+    this.drawSectionHeader(title);
 
     data.forEach((item, index) => {
       const y = this.currentY + index * 12;
-      this.drawProgressBar(item.label, (item.value / item.max) * 100, `₹${item.value.toLocaleString('en-IN')}`, y);
+      this.drawProgressBar(item.label, (item.value / item.max) * 100, this.formatCurrency(item.value), y);
     });
 
     this.currentY += data.length * 12 + 10;
   }
 
-  // Format currency
+  // Format currency — use "Rs." since core PDF fonts lack the rupee glyph
   private formatCurrency(amount: number): string {
-    return `₹${Math.abs(amount).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    return `Rs. ${Math.abs(amount).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   }
 
   // Add footer to all pages
@@ -312,7 +316,7 @@ export class EnhancedPDFGenerator {
     // Expense details
     if (data.expenses.length > 0) {
       this.checkPageBreak(40);
-      this.drawSectionHeader('Expense Details', '📝');
+      this.drawSectionHeader('Expense Details');
 
       const expenseData = data.expenses.map(e => [
         new Date(e.expense_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
@@ -390,7 +394,7 @@ export class EnhancedPDFGenerator {
 
     // Monthly breakdown table
     this.checkPageBreak(60);
-    this.drawSectionHeader('Month-by-Month Summary', '📅');
+    this.drawSectionHeader('Month-by-Month Summary');
 
     const monthlyTableData = data.monthlyData.map(m => [
       m.month,

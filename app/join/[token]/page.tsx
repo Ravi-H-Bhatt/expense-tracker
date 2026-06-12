@@ -68,7 +68,7 @@ export default function JoinGroupPage() {
         .eq('id', user.id)
         .single();
 
-      const displayName = profile?.full_name || user.email?.split('@')[0] || 'User';
+      const displayName = profile?.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
 
       // Add user as member
       const { error: memberError } = await supabase
@@ -97,13 +97,13 @@ export default function JoinGroupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl p-8 shadow-sm max-w-sm w-full text-center border border-[#E8DDD0]">
+    <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl p-8 shadow-sm max-w-sm w-full text-center border border-[#E2E8F0]">
         {status === 'loading' || status === 'joining' ? (
           <>
-            <div className="w-14 h-14 bg-[#F5EFE6] rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-14 h-14 bg-[#F1F5F9] rounded-full flex items-center justify-center mx-auto mb-4">
               <svg 
-                className="w-8 h-8 text-[#8B4513] animate-spin" 
+                className="w-8 h-8 text-[#047857] animate-spin" 
                 fill="none" 
                 viewBox="0 0 24 24"
               >
@@ -122,10 +122,10 @@ export default function JoinGroupPage() {
                 />
               </svg>
             </div>
-            <h2 className="text-xl font-['var(--font-playfair)'] font-semibold text-[#1A1208] mb-2">
+            <h2 className="text-xl font-['var(--font-playfair)'] font-semibold text-[#0F172A] mb-2">
               {groupName ? `Joining "${groupName}"` : 'Processing...'}
             </h2>
-            <p className="text-[#6B5744] font-['var(--font-dm-sans)']">
+            <p className="text-[#475569] font-['var(--font-dm-sans)']">
               You're being added to this group...
             </p>
           </>
@@ -134,10 +134,10 @@ export default function JoinGroupPage() {
             <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-2xl">✗</span>
             </div>
-            <h2 className="text-xl font-['var(--font-playfair)'] font-semibold text-[#1A1208] mb-2">
+            <h2 className="text-xl font-['var(--font-playfair)'] font-semibold text-[#0F172A] mb-2">
               Unable to Join
             </h2>
-            <p className="text-[#6B5744] font-['var(--font-dm-sans)']">
+            <p className="text-[#475569] font-['var(--font-dm-sans)']">
               The invite link is invalid or expired
             </p>
           </>

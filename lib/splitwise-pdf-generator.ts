@@ -2,14 +2,14 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const COLORS = {
-  primary: [139, 69, 19] as [number, number, number],
-  secondary: [212, 149, 106] as [number, number, number],
-  accent: [240, 192, 112] as [number, number, number],
-  bg: [255, 243, 205] as [number, number, number],
-  text: [26, 18, 8] as [number, number, number],
-  textLight: [107, 87, 68] as [number, number, number],
-  success: [34, 197, 94] as [number, number, number],
-  danger: [239, 68, 68] as [number, number, number],
+  primary: [4, 120, 87] as [number, number, number],      // emerald-700
+  secondary: [16, 185, 129] as [number, number, number],  // emerald-500
+  accent: [14, 165, 233] as [number, number, number],     // sky-500
+  bg: [236, 253, 245] as [number, number, number],        // emerald-50
+  text: [15, 23, 42] as [number, number, number],         // slate-900
+  textLight: [71, 85, 105] as [number, number, number],   // slate-600
+  success: [5, 150, 105] as [number, number, number],     // emerald-600
+  danger: [225, 29, 72] as [number, number, number],      // rose-600
   white: [255, 255, 255] as [number, number, number]
 };
 
@@ -90,13 +90,16 @@ export class SplitwisePDFGenerator {
     this.doc.text(value, x + 5, y + 17);
   }
 
-  private drawSectionHeader(title: string, icon: string = '📊') {
+  private drawSectionHeader(title: string, _icon?: string) {
     this.checkPageBreak(20);
+
+    this.doc.setFillColor(...COLORS.primary);
+    this.doc.roundedRect(this.margin, this.currentY - 1, 3, 7, 1, 1, 'F');
 
     this.doc.setFontSize(14);
     this.doc.setFont('helvetica', 'bold');
     this.doc.setTextColor(...COLORS.text);
-    this.doc.text(`${icon} ${title}`, this.margin, this.currentY + 5);
+    this.doc.text(title, this.margin + 6, this.currentY + 5);
 
     this.doc.setDrawColor(...COLORS.secondary);
     this.doc.setLineWidth(0.5);
@@ -166,14 +169,14 @@ export class SplitwisePDFGenerator {
 
   private drawMiniBarChart(data: { label: string; value: number; max: number; color?: [number, number, number] }[], title: string) {
     this.checkPageBreak(60);
-    this.drawSectionHeader(title, '📈');
+    this.drawSectionHeader(title);
 
     data.forEach((item, index) => {
       const y = this.currentY + index * 12;
       this.drawProgressBar(
         item.label, 
         (item.value / item.max) * 100, 
-        `₹${item.value.toLocaleString('en-IN')}`, 
+        this.formatCurrency(item.value), 
         y,
         item.color || COLORS.primary
       );
@@ -183,7 +186,7 @@ export class SplitwisePDFGenerator {
   }
 
   private formatCurrency(amount: number): string {
-    return `₹${Math.abs(amount).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    return `Rs. ${Math.abs(amount).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   }
 
   private addFooters(reportType: string) {

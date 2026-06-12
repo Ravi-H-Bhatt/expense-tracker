@@ -9,7 +9,7 @@
 
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -23,6 +23,14 @@ function LoginForm() {
   const [password, setPassword] = useState('');
 
   const supabase = createClient();
+
+  // Surface OAuth callback errors (e.g. provider not enabled / cancelled)
+  useEffect(() => {
+    const oauthError = searchParams?.get('error');
+    if (oauthError) {
+      toast.error(decodeURIComponent(oauthError));
+    }
+  }, [searchParams]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,7 +75,7 @@ function LoginForm() {
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
       {/* Mobile gradient bar */}
-      <div className="h-2 w-full bg-gradient-to-r from-[#6B3410] via-[#8B4513] to-[#D4956A] md:hidden" />
+      <div className="h-2 w-full bg-gradient-to-r from-[#065F46] via-[#047857] to-[#10B981] md:hidden" />
 
       {/* Left Panel - Brand Story */}
       <div className="hidden md:flex md:w-[45%] min-h-screen relative overflow-hidden">
@@ -75,7 +83,7 @@ function LoginForm() {
         <div 
           className="absolute inset-0" 
           style={{
-            background: 'linear-gradient(145deg, #6B3410 0%, #8B4513 40%, #D4956A 100%)'
+            background: 'linear-gradient(145deg, #065F46 0%, #047857 40%, #10B981 100%)'
           }}
         />
 
@@ -132,22 +140,22 @@ function LoginForm() {
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex-1 md:w-[55%] min-h-screen bg-[#FAF7F2] flex items-center justify-center p-6">
+      <div className="flex-1 md:w-[55%] min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6">
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="md:hidden mb-8 text-center">
-            <svg width="48" height="48" viewBox="0 0 56 56" className="mx-auto mb-2" fill="#8B4513">
+            <svg width="48" height="48" viewBox="0 0 56 56" className="mx-auto mb-2" fill="#047857">
               <path d="M28 4 L32 20 L48 20 L35 29 L40 45 L28 36 L16 45 L21 29 L8 20 L24 20 Z" />
             </svg>
-            <h1 className="text-2xl font-['var(--font-playfair)'] font-semibold text-[#1A1208]">RFin</h1>
+            <h1 className="text-2xl font-['var(--font-playfair)'] font-semibold text-[#0F172A]">RFin</h1>
           </div>
 
           {/* Form Header */}
           <div className="mb-8">
-            <h2 className="text-[2rem] font-['var(--font-playfair)'] font-semibold text-[#1A1208] mb-2">
+            <h2 className="text-[2rem] font-['var(--font-playfair)'] font-semibold text-[#0F172A] mb-2">
               Welcome back
             </h2>
-            <p className="text-[#6B5744] font-['var(--font-dm-sans)'] text-sm">
+            <p className="text-[#475569] font-['var(--font-dm-sans)'] text-sm">
               Sign in to your expense tracker
             </p>
           </div>
@@ -156,7 +164,7 @@ function LoginForm() {
           <button
             onClick={handleGoogleLogin}
             disabled={isLoading}
-            className="w-full bg-white border border-[#E8DDD0] rounded-xl py-3 px-4 flex items-center justify-center gap-3 font-['var(--font-dm-sans)'] font-medium text-[#1A1208] hover:bg-[#F9F6F1] hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="press w-full bg-white border border-[#E2E8F0] rounded-xl py-3 px-4 flex items-center justify-center gap-3 font-['var(--font-dm-sans)'] font-medium text-[#0F172A] hover:bg-[#F8FAFC] hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg width="20" height="20" viewBox="0 0 24 24">
               <path
@@ -182,10 +190,10 @@ function LoginForm() {
           {/* Divider */}
           <div className="relative my-8">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[#E8DDD0]" />
+              <div className="w-full border-t border-[#E2E8F0]" />
             </div>
             <div className="relative flex justify-center">
-              <span className="px-4 bg-[#FAF7F2] text-[#A89880] text-xs font-['var(--font-dm-sans)']">
+              <span className="px-4 bg-[#F8FAFC] text-[#94A3B8] text-xs font-['var(--font-dm-sans)']">
                 or continue with email
               </span>
             </div>
@@ -195,7 +203,7 @@ function LoginForm() {
           <form onSubmit={handleEmailLogin} className="space-y-5">
             {/* Email Field */}
             <div>
-              <label htmlFor="email" className="block text-sm font-['var(--font-dm-sans)'] text-[#6B5744] mb-1">
+              <label htmlFor="email" className="block text-sm font-['var(--font-dm-sans)'] text-[#475569] mb-1">
                 Email Address
               </label>
               <input
@@ -204,7 +212,7 @@ function LoginForm() {
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full border border-[#E8DDD0] rounded-xl px-4 py-3 bg-white placeholder:text-[#A89880] text-[#1A1208] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#D4956A]"
+                className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white placeholder:text-[#94A3B8] text-[#0F172A] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#10B981]"
                 required
                 disabled={isLoading}
               />
@@ -212,7 +220,7 @@ function LoginForm() {
 
             {/* Password Field */}
             <div>
-              <label htmlFor="password" className="block text-sm font-['var(--font-dm-sans)'] text-[#6B5744] mb-1">
+              <label htmlFor="password" className="block text-sm font-['var(--font-dm-sans)'] text-[#475569] mb-1">
                 Password
               </label>
               <input
@@ -221,12 +229,12 @@ function LoginForm() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full border border-[#E8DDD0] rounded-xl px-4 py-3 bg-white placeholder:text-[#A89880] text-[#1A1208] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#D4956A]"
+                className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white placeholder:text-[#94A3B8] text-[#0F172A] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#10B981]"
                 required
                 disabled={isLoading}
               />
               <div className="text-right mt-1">
-                <Link href="#" className="text-xs text-[#8B4513] font-['var(--font-dm-sans)'] hover:underline">
+                <Link href="#" className="text-xs text-[#047857] font-['var(--font-dm-sans)'] hover:underline">
                   Forgot password?
                 </Link>
               </div>
@@ -236,7 +244,7 @@ function LoginForm() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-[#8B4513] text-white rounded-xl py-3 px-4 font-['var(--font-dm-sans)'] font-medium hover:bg-[#6B3410] hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="press w-full bg-[#047857] text-white rounded-xl py-3 px-4 font-['var(--font-dm-sans)'] font-medium hover:bg-[#065F46] hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -253,9 +261,9 @@ function LoginForm() {
           </form>
 
           {/* Sign Up Link */}
-          <p className="text-center text-sm font-['var(--font-dm-sans)'] text-[#6B5744] mt-6">
+          <p className="text-center text-sm font-['var(--font-dm-sans)'] text-[#475569] mt-6">
             Don't have an account?{' '}
-            <Link href="/auth/signup" className="text-[#8B4513] font-semibold hover:underline">
+            <Link href="/auth/signup" className="text-[#047857] font-semibold hover:underline">
               Sign up
             </Link>
           </p>
@@ -268,8 +276,8 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center">
-        <div className="text-[#6B5744]">Loading...</div>
+      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+        <div className="text-[#475569]">Loading...</div>
       </div>
     }>
       <LoginForm />

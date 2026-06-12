@@ -57,16 +57,22 @@ export default function ProfileNameEditor({
 
       if (authError) throw authError;
 
-      // Update profile in database if using profiles table
+      // Update profile in database (upsert so a missing row is created)
       if (user?.id) {
         const { error: profileError } = await supabase
           .from('profiles')
-          .update({ full_name: name.trim() })
-          .eq('id', user.id);
+          .upsert(
+            {
+              id: user.id,
+              email: user.email,
+              full_name: name.trim(),
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'id' }
+          );
 
-        if (profileError && profileError.code !== 'PGRST116') {
-          // PGRST116 is "no rows found" - acceptable if profiles table doesn't exist or this user isn't in it
-          console.warn('Profile update warning:', profileError);
+        if (profileError) {
+          console.warn('Profile upsert warning:', profileError);
         }
 
         // Sync display name to all group_members records for this user
@@ -121,7 +127,7 @@ export default function ProfileNameEditor({
               onChange={(e) => setName(e.target.value)}
               onKeyDown={handleKeyDown}
               autoFocus
-              className="px-2 py-1 border border-[#D4956A] rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#8B4513]"
+              className="px-2 py-1 border border-[#10B981] rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#047857]"
             />
             <button
               onClick={saveName}
@@ -139,10 +145,10 @@ export default function ProfileNameEditor({
           </div>
         ) : (
           <div className="flex items-center gap-2 group">
-            <span className="text-sm font-medium text-[#1A1208]">{name}</span>
+            <span className="text-sm font-medium text-[#0F172A]">{name}</span>
             <button
               onClick={() => setEditing(true)}
-              className="p-1 text-[#A89880] hover:text-[#8B4513] hover:bg-[#F5EFE6] rounded opacity-0 group-hover:opacity-100 transition-all"
+              className="p-1 text-[#94A3B8] hover:text-[#047857] hover:bg-[#F1F5F9] rounded opacity-0 group-hover:opacity-100 transition-all"
               title="Edit name"
             >
               <Edit2 className="w-4 h-4" />
@@ -166,7 +172,7 @@ export default function ProfileNameEditor({
 
       {editing ? (
         <div className="space-y-3">
-          <label className="block text-sm font-medium text-[#1A1208]">Your Name</label>
+          <label className="block text-sm font-medium text-[#0F172A]">Your Name</label>
           <input
             type="text"
             value={name}
@@ -174,13 +180,13 @@ export default function ProfileNameEditor({
             onKeyDown={handleKeyDown}
             autoFocus
             placeholder="Enter your full name"
-            className="w-full px-4 py-3 border border-[#D4956A] rounded-lg text-[#1A1208] focus:outline-none focus:ring-2 focus:ring-[#8B4513] focus:border-transparent"
+            className="w-full px-4 py-3 border border-[#10B981] rounded-lg text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#047857] focus:border-transparent"
           />
           <div className="flex gap-3">
             <button
               onClick={saveName}
               disabled={saving}
-              className="flex-1 px-4 py-2 bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors disabled:opacity-50 font-medium flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2 bg-[#047857] text-white rounded-lg hover:bg-[#065F46] transition-colors disabled:opacity-50 font-medium flex items-center justify-center gap-2"
             >
               {saving ? (
                 <>
@@ -196,7 +202,7 @@ export default function ProfileNameEditor({
             </button>
             <button
               onClick={handleCancel}
-              className="px-4 py-2 border border-[#D4956A] text-[#8B4513] rounded-lg hover:bg-[#F5EFE6] transition-colors font-medium"
+              className="px-4 py-2 border border-[#10B981] text-[#047857] rounded-lg hover:bg-[#F1F5F9] transition-colors font-medium"
             >
               Cancel
             </button>
@@ -205,12 +211,12 @@ export default function ProfileNameEditor({
       ) : (
         <div className="flex items-center justify-between">
           <div>
-            <label className="block text-sm font-medium text-[#6B5744] mb-1">Your Name</label>
-            <p className="text-lg font-semibold text-[#1A1208]">{name}</p>
+            <label className="block text-sm font-medium text-[#475569] mb-1">Your Name</label>
+            <p className="text-lg font-semibold text-[#0F172A]">{name}</p>
           </div>
           <button
             onClick={() => setEditing(true)}
-            className="px-4 py-2 border border-[#D4956A] text-[#8B4513] rounded-lg hover:bg-[#F5EFE6] transition-colors font-medium flex items-center gap-2"
+            className="px-4 py-2 border border-[#10B981] text-[#047857] rounded-lg hover:bg-[#F1F5F9] transition-colors font-medium flex items-center gap-2"
           >
             <Edit2 className="w-4 h-4" />
             Edit

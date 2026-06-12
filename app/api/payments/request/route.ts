@@ -14,13 +14,7 @@ export async function POST(request: NextRequest) {
 
     const { requesterId, debtorId, amount, groupId, groupName } = await request.json();
 
-    console.log('📧 ========================================');
-    console.log('📧 PAYMENT REQUEST API CALLED');
-    console.log('📧 Requester:', requesterId);
-    console.log('📧 Debtor:', debtorId);
-    console.log('📧 Amount:', amount);
-    console.log('📧 Group:', groupName);
-    console.log('📧 ========================================');
+    console.log('📧 PAYMENT REQUEST API CALLED', { requesterId, debtorId, amount, groupName });
 
     if (!debtorId || !amount || !groupId) {
       return NextResponse.json(
@@ -29,7 +23,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get requester's details
+    // Get requester's display name (best-effort)
     const { data: requester } = await supabase
       .from('group_members')
       .select('display_name')
@@ -39,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     const requesterName = requester?.display_name || 'Someone';
 
-    // Get debtor's details and email
+    // Get debtor's display name (best-effort)
     const { data: debtorMember } = await supabase
       .from('group_members')
       .select('display_name')
@@ -51,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     // Get debtor's email using admin client
     const { data: { user: debtorUser }, error: debtorError } = await adminClient.auth.admin.getUserById(debtorId);
-    
+
     if (debtorError) {
       console.error('❌ Error fetching debtor user:', debtorError);
       return NextResponse.json({ error: 'Failed to fetch debtor details' }, { status: 500 });
@@ -64,15 +58,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Debtor email not found' }, { status: 404 });
     }
 
-    console.log('📧 Debtor email:', debtorEmail);
-    console.log('📧 Debtor name:', debtorName);
-    console.log('📧 Requester name:', requesterName);
+    console.log('📧 Sending payment request to', debtorEmail);
 
-    // Send email notification
+    // Send email notification and report the REAL result back to the client
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    
+
+    let emailSent = false;
+    let emailError: string | null = null;
     try {
-      const emailSent = await sendPaymentRequestEmail(
+      emailSent = await sendPaymentRequestEmail(
         requesterName,
         debtorEmail,
         debtorName,
@@ -80,19 +74,31 @@ export async function POST(request: NextRequest) {
         groupName,
         appUrl
       );
-
-      if (emailSent) {
-        console.log('✅✅✅ Payment request email sent successfully to', debtorEmail);
-      } else {
-        console.error('❌❌❌ Email failed to send to', debtorEmail);
-      }
-    } catch (emailError) {
-      console.error('❌❌❌ Email exception:', emailError);
+    } catch (err: any) {
+      emailError = err?.message || 'Unknown email error';
+      console.error('❌ Email exception:', err);
     }
 
+    if (!emailSent) {
+      // Distinguish a misconfigured server from a transient failure
+      const configured = !!process.env.SMTP_USER && !!process.env.SMTP_PASS;
+      return NextResponse.json(
+        {
+          success: false,
+          emailSent: false,
+          error: configured
+            ? (emailError || 'Email failed to send. Please try again.')
+            : 'Email is not configured on the server (missing SMTP credentials).',
+        },
+        { status: 502 }
+      );
+    }
+
+    console.log('✅ Payment request email sent to', debtorEmail);
     return NextResponse.json({
       success: true,
-      message: `Payment request email sent to ${debtorName}`
+      emailSent: true,
+      message: `Payment request email sent to ${debtorName}`,
     });
   } catch (error) {
     console.error('❌ Payment request error:', error);

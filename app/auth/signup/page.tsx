@@ -73,7 +73,7 @@ export default function SignupPage() {
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
       {/* Mobile gradient bar */}
-      <div className="h-2 w-full bg-gradient-to-r from-[#6B3410] via-[#8B4513] to-[#D4956A] md:hidden" />
+      <div className="h-2 w-full bg-gradient-to-r from-[#065F46] via-[#047857] to-[#10B981] md:hidden" />
 
       {/* Left Panel - Brand Story */}
       <div className="hidden md:flex md:w-[45%] min-h-screen relative overflow-hidden">
@@ -81,7 +81,7 @@ export default function SignupPage() {
         <div 
           className="absolute inset-0" 
           style={{
-            background: 'linear-gradient(145deg, #6B3410 0%, #8B4513 40%, #D4956A 100%)'
+            background: 'linear-gradient(145deg, #065F46 0%, #047857 40%, #10B981 100%)'
           }}
         />
 
@@ -138,22 +138,22 @@ export default function SignupPage() {
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex-1 md:w-[55%] min-h-screen bg-[#FAF7F2] flex items-center justify-center p-6">
+      <div className="flex-1 md:w-[55%] min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6">
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="md:hidden mb-8 text-center">
-            <svg width="48" height="48" viewBox="0 0 56 56" className="mx-auto mb-2" fill="#8B4513">
+            <svg width="48" height="48" viewBox="0 0 56 56" className="mx-auto mb-2" fill="#047857">
               <path d="M28 4 L32 20 L48 20 L35 29 L40 45 L28 36 L16 45 L21 29 L8 20 L24 20 Z" />
             </svg>
-            <h1 className="text-2xl font-['var(--font-playfair)'] font-semibold text-[#1A1208]">RFin</h1>
+            <h1 className="text-2xl font-['var(--font-playfair)'] font-semibold text-[#0F172A]">RFin</h1>
           </div>
 
           {/* Form Header */}
           <div className="mb-8">
-            <h2 className="text-[2rem] font-['var(--font-playfair)'] font-semibold text-[#1A1208] mb-2">
+            <h2 className="text-[2rem] font-['var(--font-playfair)'] font-semibold text-[#0F172A] mb-2">
               Create your account
             </h2>
-            <p className="text-[#6B5744] font-['var(--font-dm-sans)'] text-sm">
+            <p className="text-[#475569] font-['var(--font-dm-sans)'] text-sm">
               Start tracking smarter today
             </p>
           </div>
@@ -162,7 +162,7 @@ export default function SignupPage() {
           <button
             onClick={handleGoogleSignup}
             disabled={isLoading}
-            className="w-full bg-white border border-[#E8DDD0] rounded-xl py-3 px-4 flex items-center justify-center gap-3 font-['var(--font-dm-sans)'] font-medium text-[#1A1208] hover:bg-[#F9F6F1] hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="press w-full bg-white border border-[#E2E8F0] rounded-xl py-3 px-4 flex items-center justify-center gap-3 font-['var(--font-dm-sans)'] font-medium text-[#0F172A] hover:bg-[#F8FAFC] hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg width="20" height="20" viewBox="0 0 24 24">
               <path
@@ -188,10 +188,10 @@ export default function SignupPage() {
           {/* Divider */}
           <div className="relative my-8">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[#E8DDD0]" />
+              <div className="w-full border-t border-[#E2E8F0]" />
             </div>
             <div className="relative flex justify-center">
-              <span className="px-4 bg-[#FAF7F2] text-[#A89880] text-xs font-['var(--font-dm-sans)']">
+              <span className="px-4 bg-[#F8FAFC] text-[#94A3B8] text-xs font-['var(--font-dm-sans)']">
                 or continue with email
               </span>
             </div>
@@ -201,7 +201,7 @@ export default function SignupPage() {
           <form onSubmit={handleSignup} className="space-y-5">
             {/* Full Name Field */}
             <div>
-              <label htmlFor="name" className="block text-sm font-['var(--font-dm-sans)'] text-[#6B5744] mb-1">
+              <label htmlFor="name" className="block text-sm font-['var(--font-dm-sans)'] text-[#475569] mb-1">
                 Full Name
               </label>
               <input
@@ -210,7 +210,7 @@ export default function SignupPage() {
                 placeholder="John Doe"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full border border-[#E8DDD0] rounded-xl px-4 py-3 bg-white placeholder:text-[#A89880] text-[#1A1208] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#D4956A]"
+                className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white placeholder:text-[#94A3B8] text-[#0F172A] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#10B981]"
                 required
                 disabled={isLoading}
               />
@@ -218,7 +218,7 @@ export default function SignupPage() {
 
             {/* Email Field */}
             <div>
-              <label htmlFor="email" className="block text-sm font-['var(--font-dm-sans)'] text-[#6B5744] mb-1">
+              <label htmlFor="email" className="block text-sm font-['var(--font-dm-sans)'] text-[#475569] mb-1">
                 Email Address
               </label>
               <input
@@ -227,7 +227,7 @@ export default function SignupPage() {
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full border border-[#E8DDD0] rounded-xl px-4 py-3 bg-white placeholder:text-[#A89880] text-[#1A1208] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#D4956A]"
+                className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white placeholder:text-[#94A3B8] text-[#0F172A] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#10B981]"
                 required
                 disabled={isLoading}
               />
@@ -235,7 +235,7 @@ export default function SignupPage() {
 
             {/* Password Field */}
             <div>
-              <label htmlFor="password" className="block text-sm font-['var(--font-dm-sans)'] text-[#6B5744] mb-1">
+              <label htmlFor="password" className="block text-sm font-['var(--font-dm-sans)'] text-[#475569] mb-1">
                 Password
               </label>
               <input
@@ -244,7 +244,7 @@ export default function SignupPage() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full border border-[#E8DDD0] rounded-xl px-4 py-3 bg-white placeholder:text-[#A89880] text-[#1A1208] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#D4956A]"
+                className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white placeholder:text-[#94A3B8] text-[#0F172A] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#10B981]"
                 required
                 disabled={isLoading}
               />
@@ -252,7 +252,7 @@ export default function SignupPage() {
 
             {/* Confirm Password Field */}
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-['var(--font-dm-sans)'] text-[#6B5744] mb-1">
+              <label htmlFor="confirmPassword" className="block text-sm font-['var(--font-dm-sans)'] text-[#475569] mb-1">
                 Confirm Password
               </label>
               <input
@@ -261,7 +261,7 @@ export default function SignupPage() {
                 placeholder="••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full border border-[#E8DDD0] rounded-xl px-4 py-3 bg-white placeholder:text-[#A89880] text-[#1A1208] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#D4956A]"
+                className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white placeholder:text-[#94A3B8] text-[#0F172A] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#10B981]"
                 required
                 disabled={isLoading}
               />
@@ -271,7 +271,7 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-[#8B4513] text-white rounded-xl py-3 px-4 font-['var(--font-dm-sans)'] font-medium hover:bg-[#6B3410] hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="press w-full bg-[#047857] text-white rounded-xl py-3 px-4 font-['var(--font-dm-sans)'] font-medium hover:bg-[#065F46] hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -288,9 +288,9 @@ export default function SignupPage() {
           </form>
 
           {/* Sign In Link */}
-          <p className="text-center text-sm font-['var(--font-dm-sans)'] text-[#6B5744] mt-6">
+          <p className="text-center text-sm font-['var(--font-dm-sans)'] text-[#475569] mt-6">
             Already have an account?{' '}
-            <Link href="/auth/login" className="text-[#8B4513] font-semibold hover:underline">
+            <Link href="/auth/login" className="text-[#047857] font-semibold hover:underline">
               Sign in
             </Link>
           </p>

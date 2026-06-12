@@ -61,7 +61,7 @@ export default function JoinGroupModal({ onClose, onGroupJoined, currentUser }: 
       }
 
       // Add user as member
-      const displayName = currentUser.profile?.full_name || currentUser.email?.split('@')[0] || 'User';
+      const displayName = currentUser.profile?.full_name || currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'User';
       
       const { error: memberError } = await supabase
         .from('group_members')
@@ -85,15 +85,15 @@ export default function JoinGroupModal({ onClose, onGroupJoined, currentUser }: 
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-[#FAF7F2] rounded-2xl max-w-md w-full shadow-2xl">
+      <div className="bg-[#F8FAFC] rounded-2xl max-w-md w-full shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DDD0]">
-          <h2 className="text-2xl font-['var(--font-playfair)'] font-semibold text-[#1A1208]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0]">
+          <h2 className="text-2xl font-['var(--font-playfair)'] font-semibold text-[#0F172A]">
             Join a Group
           </h2>
           <button
             onClick={onClose}
-            className="text-[#6B5744] hover:text-[#1A1208] transition-colors"
+            className="text-[#475569] hover:text-[#0F172A] transition-colors"
           >
             <X className="w-6 h-6" />
           </button>
@@ -102,7 +102,7 @@ export default function JoinGroupModal({ onClose, onGroupJoined, currentUser }: 
         {/* Content */}
         <form onSubmit={handleJoin} className="px-6 py-6 space-y-5">
           <div>
-            <label htmlFor="inviteLink" className="block text-sm font-['var(--font-dm-sans)'] font-semibold text-[#6B5744] mb-2">
+            <label htmlFor="inviteLink" className="block text-sm font-['var(--font-dm-sans)'] font-semibold text-[#475569] mb-2">
               Invite Link
             </label>
             <input
@@ -111,11 +111,11 @@ export default function JoinGroupModal({ onClose, onGroupJoined, currentUser }: 
               value={inviteLink}
               onChange={(e) => setInviteLink(e.target.value)}
               placeholder="Paste the invite link here"
-              className="w-full border border-[#E8DDD0] rounded-xl px-4 py-3 bg-white placeholder:text-[#A89880] text-[#1A1208] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#D4956A]"
+              className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white placeholder:text-[#94A3B8] text-[#0F172A] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#10B981]"
               required
               disabled={isJoining}
             />
-            <p className="text-xs text-[#6B5744] font-['var(--font-dm-sans)'] mt-2">
+            <p className="text-xs text-[#475569] font-['var(--font-dm-sans)'] mt-2">
               Ask a group member for the invite link and paste it above
             </p>
           </div>
@@ -126,14 +126,14 @@ export default function JoinGroupModal({ onClose, onGroupJoined, currentUser }: 
               type="button"
               onClick={onClose}
               disabled={isJoining}
-              className="flex-1 bg-white border-2 border-[#E8DDD0] text-[#6B5744] rounded-xl py-3 px-4 font-['var(--font-dm-sans)'] font-semibold hover:bg-[#F5EFE6] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 bg-white border-2 border-[#E2E8F0] text-[#475569] rounded-xl py-3 px-4 font-['var(--font-dm-sans)'] font-semibold hover:bg-[#F1F5F9] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isJoining || !inviteLink.trim()}
-              className="flex-1 bg-[#8B4513] text-white rounded-xl py-3 px-4 font-['var(--font-dm-sans)'] font-semibold hover:bg-[#6B3410] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 bg-[#047857] text-white rounded-xl py-3 px-4 font-['var(--font-dm-sans)'] font-semibold hover:bg-[#065F46] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isJoining ? 'Joining...' : 'Join Group →'}
             </button>

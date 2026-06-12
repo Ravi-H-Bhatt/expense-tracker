@@ -23,20 +23,20 @@ export default function GroupList({ groups, selectedGroupId, onSelectGroup }: Gr
           onClick={() => onSelectGroup(group.id)}
           className={`w-full p-4 rounded-xl text-left transition-all font-['var(--font-dm-sans)'] ${
             selectedGroupId === group.id
-              ? 'bg-white shadow-sm border border-[#E8DDD0]'
+              ? 'bg-white shadow-sm border border-[#E2E8F0]'
               : 'bg-white/50 hover:bg-white border border-transparent'
           }`}
         >
-          <h3 className="font-semibold text-[#1A1208] mb-1 truncate">
+          <h3 className="font-semibold text-[#0F172A] mb-1 truncate">
             {group.name}
           </h3>
           {group.description && (
-            <p className="text-sm text-[#6B5744] mb-2 truncate">
+            <p className="text-sm text-[#475569] mb-2 truncate">
               {group.description}
             </p>
           )}
           {group.group_fund > 0 && (
-            <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-[#FFF3CD] rounded-full text-xs font-medium text-[#8B4513]">
+            <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-[#ECFDF5] rounded-full text-xs font-medium text-[#047857]">
               <span>📦</span>
               <span>Fund: {formatCurrency(group.group_fund)}</span>
             </div>

@@ -123,21 +123,24 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-[#6B5744]">Loading...</div>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-3 border-[#E2E8F0] border-t-[#047857] rounded-full animate-spin" />
+          <div className="text-[#475569] font-['var(--font-dm-sans)']">Loading your dashboard...</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F5EFE6] p-4 lg:p-8">
+    <div className="p-1 sm:p-2 lg:p-4">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-6 lg:mb-8">
-          <h1 className="text-2xl lg:text-3xl font-['var(--font-playfair)'] font-bold text-[#1A1208] mb-2">
-            Welcome back! 👋
+        <div className="mb-6 lg:mb-8 animate-fade-in-up">
+          <h1 className="text-2xl lg:text-4xl font-['var(--font-playfair)'] font-bold text-[#0F172A] mb-2">
+            Welcome back{user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name.split(' ')[0]}` : ''} 👋
           </h1>
-          <p className="text-sm lg:text-base text-[#6B5744] font-['var(--font-dm-sans)']">
+          <p className="text-sm lg:text-base text-[#475569] font-['var(--font-dm-sans)']">
             Here's your financial overview
           </p>
         </div>
@@ -145,16 +148,16 @@ export default function DashboardPage() {
         {/* Payment Requests Section */}
         {notifications.length > 0 && (
           <div className="mb-6 lg:mb-8">
-            <div className="bg-white rounded-2xl border border-[#E8DDD0] p-6 lg:p-8">
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 lg:p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
                   <Bell className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-['var(--font-playfair)'] font-semibold text-[#1A1208]">
+                  <h2 className="text-xl font-['var(--font-playfair)'] font-semibold text-[#0F172A]">
                     Notifications
                   </h2>
-                  <p className="text-sm text-[#6B5744] font-['var(--font-dm-sans)']">
+                  <p className="text-sm text-[#475569] font-['var(--font-dm-sans)']">
                     {notifications.length} pending notification{notifications.length !== 1 ? 's' : ''}
                   </p>
                 </div>
@@ -164,21 +167,21 @@ export default function DashboardPage() {
                 {notifications.map((notif) => (
                   <div
                     key={notif.id}
-                    className="bg-[#F5EFE6] rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                    className="bg-muted rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-scale-in"
                   >
                     <div className="flex-1">
-                      <h3 className="font-['var(--font-dm-sans)'] font-semibold text-[#1A1208] mb-1">
+                      <h3 className="font-['var(--font-dm-sans)'] font-semibold text-foreground mb-1">
                         {notif.title}
                       </h3>
-                      <p className="text-sm text-[#6B5744] font-['var(--font-dm-sans)']">
+                      <p className="text-sm text-muted-foreground font-['var(--font-dm-sans)']">
                         {notif.message}
                       </p>
                       {notif.amount && (
-                        <p className="text-lg font-['var(--font-playfair)'] font-bold text-[#8B4513] mt-2">
+                        <p className="text-lg font-['var(--font-playfair)'] font-bold text-money mt-2">
                           ₹{notif.amount.toLocaleString('en-IN')}
                         </p>
                       )}
-                      <p className="text-xs text-[#A89880] mt-1">
+                      <p className="text-xs text-muted-foreground/70 mt-1">
                         {new Date(notif.created_at).toLocaleString('en-IN', {
                           dateStyle: 'medium',
                           timeStyle: 'short'
@@ -269,13 +272,13 @@ export default function DashboardPage() {
                         <>
                           <button
                             onClick={() => handlePayNow(notif)}
-                            className="flex-1 sm:flex-initial px-4 py-2 bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors text-sm font-medium whitespace-nowrap"
+                            className="flex-1 sm:flex-initial px-4 py-2 bg-[#047857] text-white rounded-lg hover:bg-[#065F46] transition-colors text-sm font-medium whitespace-nowrap"
                           >
                             Pay Now
                           </button>
                           <button
                             onClick={() => handleDismissNotification(notif.id)}
-                            className="flex-1 sm:flex-initial px-4 py-2 border border-[#E8DDD0] text-[#6B5744] rounded-lg hover:bg-[#F5EFE6] transition-colors text-sm font-medium whitespace-nowrap"
+                            className="flex-1 sm:flex-initial px-4 py-2 border border-[#E2E8F0] text-[#475569] rounded-lg hover:bg-[#F1F5F9] transition-colors text-sm font-medium whitespace-nowrap"
                           >
                             Dismiss
                           </button>
@@ -286,7 +289,7 @@ export default function DashboardPage() {
                       {notif.type !== 'settlement_pending' && notif.type !== 'payment_request' && (
                         <button
                           onClick={() => handleDismissNotification(notif.id)}
-                          className="flex-1 sm:flex-initial px-4 py-2 border border-[#E8DDD0] text-[#6B5744] rounded-lg hover:bg-[#F5EFE6] transition-colors text-sm font-medium whitespace-nowrap"
+                          className="flex-1 sm:flex-initial px-4 py-2 border border-[#E2E8F0] text-[#475569] rounded-lg hover:bg-[#F1F5F9] transition-colors text-sm font-medium whitespace-nowrap"
                         >
                           Dismiss
                         </button>
@@ -300,16 +303,17 @@ export default function DashboardPage() {
         )}
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-6 lg:mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-6 lg:mb-8 stagger">
           {/* Total Groups */}
-          <div className="bg-white rounded-2xl border border-[#E8DDD0] p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
-                <Users className="w-6 h-6 text-purple-600" />
+          <div className="relative overflow-hidden bg-gradient-to-br from-[#047857] to-[#10B981] rounded-2xl p-6 hover-lift shadow-sm">
+            <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-white/10" />
+            <div className="relative flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                <Users className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-[#6B5744] font-['var(--font-dm-sans)']">Active Groups</p>
-                <p className="text-2xl font-['var(--font-playfair)'] font-bold text-[#1A1208]">
+                <p className="text-sm text-white/80 font-['var(--font-dm-sans)']">Active Groups</p>
+                <p className="text-3xl font-['var(--font-playfair)'] font-bold text-white">
                   {groups.length}
                 </p>
               </div>
@@ -317,14 +321,15 @@ export default function DashboardPage() {
           </div>
 
           {/* Pending Payments */}
-          <div className="bg-white rounded-2xl border border-[#E8DDD0] p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-orange-600" />
+          <div className="relative overflow-hidden bg-gradient-to-br from-[#10B981] to-[#34D399] rounded-2xl p-6 hover-lift shadow-sm">
+            <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-white/10" />
+            <div className="relative flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-[#6B5744] font-['var(--font-dm-sans)']">Pending Requests</p>
-                <p className="text-2xl font-['var(--font-playfair)'] font-bold text-[#1A1208]">
+                <p className="text-sm text-white/80 font-['var(--font-dm-sans)']">Pending Requests</p>
+                <p className="text-3xl font-['var(--font-playfair)'] font-bold text-white">
                   {notifications.length}
                 </p>
               </div>
@@ -332,16 +337,16 @@ export default function DashboardPage() {
           </div>
 
           {/* Quick Access */}
-          <div className="bg-white rounded-2xl border border-[#E8DDD0] p-6">
+          <div className="relative overflow-hidden bg-white border border-[#E2E8F0] rounded-2xl p-6 hover-lift shadow-sm">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-2xl bg-green-100 flex items-center justify-center">
                 <Wallet className="w-6 h-6 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-[#6B5744] font-['var(--font-dm-sans)']">Quick Actions</p>
+                <p className="text-sm text-[#475569] font-['var(--font-dm-sans)']">Quick Actions</p>
                 <button
                   onClick={() => router.push('/dashboard/splitwise')}
-                  className="text-sm text-[#8B4513] font-medium hover:underline mt-1"
+                  className="text-base text-[#047857] font-semibold hover:underline mt-1"
                 >
                   Go to Splitwise →
                 </button>
@@ -352,27 +357,30 @@ export default function DashboardPage() {
 
         {/* Your Groups */}
         {groups.length > 0 && (
-          <div className="bg-white rounded-2xl border border-[#E8DDD0] p-6 lg:p-8">
-            <h2 className="text-xl font-['var(--font-playfair)'] font-semibold text-[#1A1208] mb-6">
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 lg:p-8 animate-fade-in-up">
+            <h2 className="text-xl font-['var(--font-playfair)'] font-semibold text-[#0F172A] mb-6">
               Your Groups
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 stagger">
               {groups.map((group) => (
                 <button
                   key={group.id}
                   onClick={() => router.push(`/dashboard/splitwise?group=${group.id}`)}
-                  className="bg-[#F5EFE6] rounded-xl p-4 text-left hover:bg-[#E8DDD0] transition-colors"
+                  className="press bg-gradient-to-br from-[#F1F5F9] to-[#ECFDF5] rounded-xl p-5 text-left hover-lift border border-[#E2E8F0]"
                 >
-                  <h3 className="font-['var(--font-dm-sans)'] font-semibold text-[#1A1208] mb-2">
+                  <div className="w-10 h-10 rounded-xl bg-[#047857] text-white flex items-center justify-center font-['var(--font-playfair)'] font-bold mb-3">
+                    {group.name?.[0]?.toUpperCase() || 'G'}
+                  </div>
+                  <h3 className="font-['var(--font-dm-sans)'] font-semibold text-[#0F172A] mb-1">
                     {group.name}
                   </h3>
                   {group.description && (
-                    <p className="text-sm text-[#6B5744] font-['var(--font-dm-sans)'] mb-2">
+                    <p className="text-sm text-[#475569] font-['var(--font-dm-sans)'] mb-2 line-clamp-2">
                       {group.description}
                     </p>
                   )}
                   {group.group_fund > 0 && (
-                    <p className="text-sm font-['var(--font-dm-sans)'] text-[#8B4513]">
+                    <p className="text-sm font-['var(--font-dm-sans)'] text-[#047857] font-medium">
                       Fund: ₹{group.group_fund.toLocaleString('en-IN')}
                     </p>
                   )}
@@ -384,19 +392,19 @@ export default function DashboardPage() {
 
         {/* Empty State */}
         {notifications.length === 0 && groups.length === 0 && (
-          <div className="bg-white rounded-2xl border border-[#E8DDD0] p-12 text-center">
-            <div className="w-20 h-20 rounded-full bg-[#F5EFE6] flex items-center justify-center mx-auto mb-4">
-              <Users className="w-10 h-10 text-[#8B4513]" />
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] p-12 text-center">
+            <div className="w-20 h-20 rounded-full bg-[#F1F5F9] flex items-center justify-center mx-auto mb-4">
+              <Users className="w-10 h-10 text-[#047857]" />
             </div>
-            <h3 className="text-xl font-['var(--font-playfair)'] font-semibold text-[#1A1208] mb-2">
+            <h3 className="text-xl font-['var(--font-playfair)'] font-semibold text-[#0F172A] mb-2">
               No groups yet
             </h3>
-            <p className="text-sm text-[#6B5744] font-['var(--font-dm-sans)'] mb-6">
+            <p className="text-sm text-[#475569] font-['var(--font-dm-sans)'] mb-6">
               Create or join a group to start tracking expenses
             </p>
             <button
               onClick={() => router.push('/dashboard/splitwise')}
-              className="px-6 py-3 bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors font-['var(--font-dm-sans)'] font-medium"
+              className="px-6 py-3 bg-[#047857] text-white rounded-lg hover:bg-[#065F46] transition-colors font-['var(--font-dm-sans)'] font-medium"
             >
               Go to Splitwise
             </button>

@@ -132,8 +132,10 @@ export default function GroupSummary({
         return;
       }
 
-      // Create payment request record
-      const { error } = await supabase
+      const requesterName = currentUser.profile?.full_name || currentUser.email?.split('@')[0] || 'Someone';
+
+      // Record the payment request + in-app notification (best-effort, must not block email)
+      const { error: prError } = await supabase
         .from('payment_requests')
         .insert({
           from_user_id: currentUser.id,
@@ -143,12 +145,9 @@ export default function GroupSummary({
           status: 'pending',
           created_at: new Date().toISOString()
         });
+      if (prError) console.error('payment_requests insert failed:', prError);
 
-      if (error) throw error;
-
-      // Create notification for the debtor
-      const requesterName = currentUser.profile?.full_name || currentUser.email?.split('@')[0] || 'Someone';
-      await supabase
+      const { error: notifError } = await supabase
         .from('notifications')
         .insert({
           user_id: debtor.user_id,
@@ -160,9 +159,9 @@ export default function GroupSummary({
           amount: amount,
           status: 'unread'
         });
+      if (notifError) console.error('notification insert failed:', notifError);
 
-      // Send email to debtor
-      console.log('📧 Sending payment request email...');
+      // Send the reminder email — this is the primary action
       const response = await fetch('/api/payments/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -175,16 +174,22 @@ export default function GroupSummary({
         })
       });
 
-      if (response.ok) {
-        console.log('✅ Payment request email sent');
+      const result = await response.json().catch(() => ({}));
+
+      if (response.ok && result.emailSent) {
+        toast.success(`Reminder email sent to ${memberName}`);
       } else {
-        console.error('❌ Failed to send payment request email');
+        // The in-app notification still went through, so tell the truth about email
+        toast.warning(
+          result.error
+            ? `Notified ${memberName} in-app, but email failed: ${result.error}`
+            : `Notified ${memberName} in-app, but the email could not be sent.`
+        );
       }
 
-      toast.success(`Payment request sent to ${memberName}!`);
       onUpdate();
-    } catch (error) {
-      toast.error('Failed to send payment request');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to send payment request');
       console.error(error);
     }
   };
@@ -273,7 +278,7 @@ export default function GroupSummary({
     });
   }
 
-  const COLORS = ['#8B4513', '#D4956A', '#F0C070', '#A0522D', '#DEB887', '#C19A6B'];
+  const COLORS = ['#047857', '#10B981', '#0EA5E9', '#6366F1', '#14B8A6', '#34D399'];
 
   const totalGroupFundSpent = expenses
     .filter(e => e.is_group_fund_expense)
@@ -462,19 +467,19 @@ export default function GroupSummary({
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
   return (
-    <div className="h-full overflow-y-auto p-3 lg:p-6 space-y-4 lg:space-y-6">
+    <div className="h-full overflow-y-auto p-3 lg:p-6 space-y-4 lg:space-y-6 stagger">
       {/* Export Report Section */}
-      <div className="bg-white rounded-2xl border border-[#E8DDD0] p-4 lg:p-6">
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 lg:p-6 hover-lift">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Download className="w-5 h-5 text-[#8B4513]" />
-            <h3 className="font-['var(--font-playfair)'] font-semibold text-[#1A1208] text-lg lg:text-xl">
+            <Download className="w-5 h-5 text-[#047857]" />
+            <h3 className="font-['var(--font-playfair)'] font-semibold text-[#0F172A] text-lg lg:text-xl">
               Export Monthly Report
             </h3>
           </div>
           <button
             onClick={() => setShowExportMenu(!showExportMenu)}
-            className="px-4 py-2 bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors text-sm font-['var(--font-dm-sans)'] font-medium flex items-center gap-2"
+            className="press px-4 py-2 bg-[#047857] text-white rounded-lg hover:bg-[#065F46] transition-colors text-sm font-['var(--font-dm-sans)'] font-medium flex items-center gap-2"
           >
             <Calendar className="w-4 h-4" />
             Export PDF
@@ -482,9 +487,9 @@ export default function GroupSummary({
         </div>
 
         {showExportMenu && (
-          <div className="bg-[#F5EFE6] rounded-xl p-4 space-y-4">
+          <div className="bg-[#F1F5F9] rounded-xl p-4 space-y-4 animate-fade-in-up">
             <div>
-              <label className="block text-sm font-['var(--font-dm-sans)'] font-medium text-[#6B5744] mb-2">
+              <label className="block text-sm font-['var(--font-dm-sans)'] font-medium text-[#475569] mb-2">
                 Report Type
               </label>
               <div className="flex gap-2">
@@ -492,8 +497,8 @@ export default function GroupSummary({
                   onClick={() => setReportType('monthly')}
                   className={`flex-1 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
                     reportType === 'monthly'
-                      ? 'bg-[#8B4513] text-white'
-                      : 'bg-white text-[#8B4513] border border-[#D4956A]'
+                      ? 'bg-[#047857] text-white'
+                      : 'bg-white text-[#047857] border border-[#10B981]'
                   }`}
                 >
                   📅 Monthly Report
@@ -502,8 +507,8 @@ export default function GroupSummary({
                   onClick={() => setReportType('yearly')}
                   className={`flex-1 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
                     reportType === 'yearly'
-                      ? 'bg-[#8B4513] text-white'
-                      : 'bg-white text-[#8B4513] border border-[#D4956A]'
+                      ? 'bg-[#047857] text-white'
+                      : 'bg-white text-[#047857] border border-[#10B981]'
                   }`}
                 >
                   📊 Yearly Report
@@ -514,13 +519,13 @@ export default function GroupSummary({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {reportType === 'monthly' && (
                 <div>
-                  <label className="block text-sm font-['var(--font-dm-sans)'] font-medium text-[#6B5744] mb-2">
+                  <label className="block text-sm font-['var(--font-dm-sans)'] font-medium text-[#475569] mb-2">
                     Select Month
                   </label>
                   <select
                     value={selectedMonth}
                     onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-[#D4956A] rounded-lg text-[#1A1208] focus:outline-none focus:ring-2 focus:ring-[#8B4513] font-['var(--font-dm-sans)']"
+                    className="w-full px-3 py-2 border border-[#10B981] rounded-lg text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#047857] font-['var(--font-dm-sans)']"
                   >
                     {months.map((month, index) => (
                       <option key={index} value={index}>
@@ -532,13 +537,13 @@ export default function GroupSummary({
               )}
 
               <div className={reportType === 'yearly' ? 'col-span-2' : ''}>
-                <label className="block text-sm font-['var(--font-dm-sans)'] font-medium text-[#6B5744] mb-2">
+                <label className="block text-sm font-['var(--font-dm-sans)'] font-medium text-[#475569] mb-2">
                   Select Year
                 </label>
                 <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-[#D4956A] rounded-lg text-[#1A1208] focus:outline-none focus:ring-2 focus:ring-[#8B4513] font-['var(--font-dm-sans)']"
+                  className="w-full px-3 py-2 border border-[#10B981] rounded-lg text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#047857] font-['var(--font-dm-sans)']"
                 >
                   {years.map((year) => (
                     <option key={year} value={year}>
@@ -560,14 +565,14 @@ export default function GroupSummary({
             <div className="flex gap-2">
               <button
                 onClick={handleExportReport}
-                className="flex-1 px-4 py-2 bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors text-sm font-['var(--font-dm-sans)'] font-medium flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2 bg-[#047857] text-white rounded-lg hover:bg-[#065F46] transition-colors text-sm font-['var(--font-dm-sans)'] font-medium flex items-center justify-center gap-2"
               >
                 <Download className="w-4 h-4" />
                 Generate {reportType === 'monthly' ? 'Monthly' : 'Yearly'} Report
               </button>
               <button
                 onClick={() => setShowExportMenu(false)}
-                className="px-4 py-2 border border-[#D4956A] text-[#8B4513] rounded-lg hover:bg-[#F5EFE6] transition-colors text-sm font-['var(--font-dm-sans)'] font-medium"
+                className="px-4 py-2 border border-[#10B981] text-[#047857] rounded-lg hover:bg-[#F1F5F9] transition-colors text-sm font-['var(--font-dm-sans)'] font-medium"
               >
                 Cancel
               </button>
@@ -578,22 +583,22 @@ export default function GroupSummary({
 
       {/* Payment Request Notifications */}
       {notifications.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 lg:p-6">
-          <h3 className="font-['var(--font-playfair)'] font-semibold text-[#1A1208] text-lg lg:text-xl mb-3 lg:mb-4 flex items-center gap-2">
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 lg:p-6 animate-fade-in-up">
+          <h3 className="font-['var(--font-playfair)'] font-semibold text-[#0F172A] text-lg lg:text-xl mb-3 lg:mb-4 flex items-center gap-2">
             <span>🔔</span> Notifications
           </h3>
           <div className="space-y-3">
             {notifications.map((notif) => (
-              <div key={notif.id} className="bg-white rounded-xl p-4">
+              <div key={notif.id} className="bg-white rounded-xl p-4 animate-scale-in hover-lift">
                 <div className="flex-1 mb-3">
-                  <p className="font-['var(--font-dm-sans)'] font-medium text-[#1A1208] text-sm lg:text-base">
+                  <p className="font-['var(--font-dm-sans)'] font-medium text-[#0F172A] text-sm lg:text-base">
                     {notif.title}
                   </p>
-                  <p className="text-xs lg:text-sm text-[#6B5744] mt-1">
+                  <p className="text-xs lg:text-sm text-[#475569] mt-1">
                     {notif.message}
                   </p>
                   {notif.amount && (
-                    <p className="text-lg font-['var(--font-playfair)'] font-bold text-[#8B4513] mt-2">
+                    <p className="text-lg font-['var(--font-playfair)'] font-bold text-[#047857] mt-2">
                       ₹{notif.amount.toLocaleString('en-IN')}
                     </p>
                   )}
@@ -644,7 +649,7 @@ export default function GroupSummary({
                         }
                       }}
                       disabled={processingNotif === notif.id}
-                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="press flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {processingNotif === notif.id ? 'Processing...' : '✓ Confirm Receipt'}
                     </button>
@@ -690,7 +695,7 @@ export default function GroupSummary({
                         }
                       }}
                       disabled={processingNotif === notif.id}
-                      className="flex-1 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="press flex-1 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {processingNotif === notif.id ? 'Processing...' : '✗ Not Received'}
                     </button>
@@ -710,7 +715,7 @@ export default function GroupSummary({
                       
                       toast.info('Navigate to the dashboard to complete payment');
                     }}
-                    className="w-full px-4 py-2 bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors text-sm font-medium"
+                    className="press w-full px-4 py-2 bg-[#047857] text-white rounded-lg hover:bg-[#065F46] transition-colors text-sm font-medium"
                   >
                     Pay Now
                   </button>
@@ -727,7 +732,7 @@ export default function GroupSummary({
                       fetchNotifications();
                       toast.success('Notification dismissed');
                     }}
-                    className="w-full px-4 py-2 border border-[#E8DDD0] text-[#6B5744] rounded-lg hover:bg-[#F5EFE6] transition-colors text-sm font-medium"
+                    className="press w-full px-4 py-2 border border-[#E2E8F0] text-[#475569] rounded-lg hover:bg-[#F1F5F9] transition-colors text-sm font-medium"
                   >
                     Dismiss
                   </button>
@@ -740,26 +745,26 @@ export default function GroupSummary({
 
       {/* Group Fund Box */}
       {group.group_fund > 0 || totalGroupFundSpent > 0 ? (
-        <div className="bg-[#FFF3CD] border border-[#F0C040] rounded-2xl p-4 lg:p-6">
+        <div className="bg-[#ECFDF5] border border-[#A7F3D0] rounded-2xl p-4 lg:p-6 hover-lift">
           <div className="flex items-center gap-2 mb-3 lg:mb-4">
             <span className="text-xl lg:text-2xl">📦</span>
-            <h3 className="font-['var(--font-playfair)'] font-semibold text-[#8B4513] text-lg lg:text-xl">
+            <h3 className="font-['var(--font-playfair)'] font-semibold text-[#047857] text-lg lg:text-xl">
               Group Fund
             </h3>
           </div>
           <div className="space-y-2 font-['var(--font-dm-sans)'] text-sm lg:text-base">
-            <div className="flex justify-between text-[#8B4513]">
+            <div className="flex justify-between text-[#047857]">
               <span>Total Fund:</span>
               <span className="font-semibold">
                 {formatCurrency((group.group_fund || 0) + totalGroupFundSpent)}
               </span>
             </div>
-            <div className="flex justify-between text-[#8B4513]">
+            <div className="flex justify-between text-[#047857]">
               <span>Total Spent:</span>
               <span className="font-semibold">{formatCurrency(totalGroupFundSpent)}</span>
             </div>
-            <div className="h-px bg-[#F0C040] my-2" />
-            <div className="flex justify-between text-[#8B4513]">
+            <div className="h-px bg-[#A7F3D0] my-2" />
+            <div className="flex justify-between text-[#047857]">
               <span className="font-semibold">Remaining:</span>
               <span className="font-bold text-lg lg:text-xl">
                 {formatCurrency(group.group_fund || 0)}
@@ -770,8 +775,8 @@ export default function GroupSummary({
       ) : null}
 
       {/* Balance Sheet */}
-      <div className="bg-white rounded-2xl border border-[#E8DDD0] p-4 lg:p-6">
-        <h3 className="font-['var(--font-playfair)'] font-semibold text-[#1A1208] text-lg lg:text-xl mb-3 lg:mb-4">
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 lg:p-6 hover-lift">
+        <h3 className="font-['var(--font-playfair)'] font-semibold text-[#0F172A] text-lg lg:text-xl mb-3 lg:mb-4">
           Balance Sheet
         </h3>
         
@@ -779,34 +784,34 @@ export default function GroupSummary({
           <div className="inline-block min-w-full align-middle px-4 lg:px-0">
             <table className="w-full font-['var(--font-dm-sans)']">
               <thead>
-                <tr className="border-b border-[#E8DDD0]">
-                  <th className="text-left py-2 lg:py-3 px-1 lg:px-2 text-xs lg:text-sm font-semibold text-[#6B5744]">Member</th>
-                  <th className="text-right py-2 lg:py-3 px-1 lg:px-2 text-xs lg:text-sm font-semibold text-[#6B5744]">Paid</th>
-                  <th className="text-right py-2 lg:py-3 px-1 lg:px-2 text-xs lg:text-sm font-semibold text-[#6B5744]">Owes</th>
-                  <th className="text-right py-2 lg:py-3 px-1 lg:px-2 text-xs lg:text-sm font-semibold text-[#6B5744]">Net</th>
-                  <th className="text-right py-2 lg:py-3 px-1 lg:px-2 text-xs lg:text-sm font-semibold text-[#6B5744]">Action</th>
+                <tr className="border-b border-[#E2E8F0]">
+                  <th className="text-left py-2 lg:py-3 px-1 lg:px-2 text-xs lg:text-sm font-semibold text-[#475569]">Member</th>
+                  <th className="text-right py-2 lg:py-3 px-1 lg:px-2 text-xs lg:text-sm font-semibold text-[#475569]">Paid</th>
+                  <th className="text-right py-2 lg:py-3 px-1 lg:px-2 text-xs lg:text-sm font-semibold text-[#475569]">Owes</th>
+                  <th className="text-right py-2 lg:py-3 px-1 lg:px-2 text-xs lg:text-sm font-semibold text-[#475569]">Net</th>
+                  <th className="text-right py-2 lg:py-3 px-1 lg:px-2 text-xs lg:text-sm font-semibold text-[#475569]">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {Object.entries(balances).map(([name, data]: [string, any]) => (
-                  <tr key={name} className="border-b border-[#E8DDD0] last:border-0">
+                  <tr key={name} className="border-b border-[#E2E8F0] last:border-0">
                     <td className="py-2 lg:py-3 px-1 lg:px-2">
                       <div className="flex items-center gap-1.5 lg:gap-2">
-                        <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-full bg-[#8B4513] text-white flex items-center justify-center text-xs lg:text-sm font-semibold flex-shrink-0">
+                        <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-full bg-[#047857] text-white flex items-center justify-center text-xs lg:text-sm font-semibold flex-shrink-0">
                           {name[0].toUpperCase()}
                         </div>
-                        <span className="font-medium text-[#1A1208] text-xs lg:text-base truncate">{name}</span>
+                        <span className="font-medium text-[#0F172A] text-xs lg:text-base truncate">{name}</span>
                       </div>
                     </td>
-                    <td className="text-right py-2 lg:py-3 px-1 lg:px-2 text-[#1A1208] text-xs lg:text-base whitespace-nowrap">
+                    <td className="text-right py-2 lg:py-3 px-1 lg:px-2 text-[#0F172A] text-xs lg:text-base whitespace-nowrap">
                       {formatCurrency(data.paid)}
                     </td>
-                    <td className="text-right py-2 lg:py-3 px-1 lg:px-2 text-[#1A1208] text-xs lg:text-base whitespace-nowrap">
+                    <td className="text-right py-2 lg:py-3 px-1 lg:px-2 text-[#0F172A] text-xs lg:text-base whitespace-nowrap">
                       {formatCurrency(data.owes)}
                     </td>
                     <td className="text-right py-2 lg:py-3 px-1 lg:px-2">
                       <span className={`font-semibold text-xs lg:text-base whitespace-nowrap ${
-                        data.net > 0 ? 'text-green-600' : data.net < 0 ? 'text-red-600' : 'text-[#6B5744]'
+                        data.net > 0 ? 'text-green-600' : data.net < 0 ? 'text-red-600' : 'text-[#475569]'
                       }`}>
                         {data.net === 0 ? 'Settled' : `${data.net > 0 ? '+' : ''}${formatCurrency(data.net)}`}
                       </span>
@@ -829,7 +834,7 @@ export default function GroupSummary({
                                     }
                                   }}
                                   disabled={isSettling}
-                                  className="px-2 lg:px-3 py-1 lg:py-1.5 text-xs bg-[#8B4513] text-white rounded-lg hover:bg-[#6B3410] transition-colors font-medium whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="press px-2 lg:px-3 py-1 lg:py-1.5 text-xs bg-[#047857] text-white rounded-lg hover:bg-[#065F46] transition-colors font-medium whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                                   title={`Pay ₹${Math.abs(data.net).toLocaleString('en-IN')}`}
                                 >
                                   {isSettling ? 'Processing...' : 'Pay'}
@@ -840,7 +845,7 @@ export default function GroupSummary({
                             /* Other person owes current user - show Request button */
                             <button
                               onClick={() => handleSendPaymentRequest(name, Math.abs(data.net))}
-                              className="px-2 lg:px-3 py-1 lg:py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium whitespace-nowrap"
+                              className="press px-2 lg:px-3 py-1 lg:py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-medium whitespace-nowrap"
                               title={`Request ₹${Math.abs(data.net).toLocaleString('en-IN')} from ${name}`}
                             >
                               Request
@@ -858,17 +863,17 @@ export default function GroupSummary({
 
         {Object.keys(balances).length === 0 && (
           <div className="text-center py-8">
-            <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-full bg-[#F5EFE6] flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-full bg-[#F1F5F9] flex items-center justify-center mx-auto mb-3">
               <span className="text-2xl lg:text-3xl">💰</span>
             </div>
-            <p className="text-[#6B5744] font-['var(--font-dm-sans)'] text-sm lg:text-base">No balance data yet</p>
+            <p className="text-[#475569] font-['var(--font-dm-sans)'] text-sm lg:text-base">No balance data yet</p>
           </div>
         )}
       </div>
 
       {/* Pie Chart - Reactive with Empty State */}
-      <div className="bg-white rounded-2xl border border-[#E8DDD0] p-4 lg:p-6">
-        <h3 className="font-['var(--font-playfair)'] font-semibold text-[#1A1208] text-lg lg:text-xl mb-3 lg:mb-4">
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 lg:p-6 hover-lift">
+        <h3 className="font-['var(--font-playfair)'] font-semibold text-[#0F172A] text-lg lg:text-xl mb-3 lg:mb-4">
           Spending by Member
         </h3>
         
@@ -894,7 +899,7 @@ export default function GroupSummary({
                 formatter={(value: any) => formatCurrency(value)}
                 contentStyle={{
                   backgroundColor: 'white',
-                  border: '1px solid #E8DDD0',
+                  border: '1px solid #E2E8F0',
                   borderRadius: '12px',
                   fontFamily: 'var(--font-dm-sans)',
                   fontSize: '14px'
@@ -905,64 +910,64 @@ export default function GroupSummary({
         ) : (
           <div className="flex flex-col items-center justify-center py-12 lg:py-16">
             <div className="w-24 h-24 lg:w-32 lg:h-32 rounded-full border-8 border-gray-200 mb-4"></div>
-            <p className="text-[#6B5744] font-['var(--font-dm-sans)'] text-sm lg:text-base">No expenses yet</p>
+            <p className="text-[#475569] font-['var(--font-dm-sans)'] text-sm lg:text-base">No expenses yet</p>
           </div>
         )}
       </div>
 
       {/* Bar Chart - Category Breakdown */}
       {categoryData.length > 0 && (
-        <div className="bg-white rounded-2xl border border-[#E8DDD0] p-4 lg:p-6">
-          <h3 className="font-['var(--font-playfair)'] font-semibold text-[#1A1208] text-lg lg:text-xl mb-3 lg:mb-4">
+        <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 lg:p-6 hover-lift">
+          <h3 className="font-['var(--font-playfair)'] font-semibold text-[#0F172A] text-lg lg:text-xl mb-3 lg:mb-4">
             Spending by Category
           </h3>
           
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={categoryData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E8DDD0" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
               <XAxis 
                 dataKey="name" 
-                tick={{ fill: '#6B5744', fontSize: 12 }}
-                axisLine={{ stroke: '#E8DDD0' }}
+                tick={{ fill: '#475569', fontSize: 12 }}
+                axisLine={{ stroke: '#E2E8F0' }}
               />
               <YAxis 
-                tick={{ fill: '#6B5744', fontSize: 12 }}
-                axisLine={{ stroke: '#E8DDD0' }}
+                tick={{ fill: '#475569', fontSize: 12 }}
+                axisLine={{ stroke: '#E2E8F0' }}
                 tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`}
               />
               <Tooltip 
                 formatter={(value: any) => formatCurrency(value)}
                 contentStyle={{
                   backgroundColor: 'white',
-                  border: '1px solid #E8DDD0',
+                  border: '1px solid #E2E8F0',
                   borderRadius: '12px',
                   fontFamily: 'var(--font-dm-sans)',
                   fontSize: '14px'
                 }}
               />
-              <Bar dataKey="value" fill="#8B4513" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="value" fill="#047857" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       )}
 
       {/* Recent Expenses List with Delete Button */}
-      <div className="bg-white rounded-2xl border border-[#E8DDD0] p-4 lg:p-6">
-        <h3 className="font-['var(--font-playfair)'] font-semibold text-[#1A1208] text-lg lg:text-xl mb-3 lg:mb-4">
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 lg:p-6 hover-lift">
+        <h3 className="font-['var(--font-playfair)'] font-semibold text-[#0F172A] text-lg lg:text-xl mb-3 lg:mb-4">
           Recent Expenses
         </h3>
         
         <div className="space-y-2 lg:space-y-3">
           {expenses.slice(0, 10).map((expense) => (
-            <div key={expense.id} className="flex items-center gap-2 lg:gap-3 py-2 lg:py-3 border-b border-[#E8DDD0] last:border-0">
+            <div key={expense.id} className="flex items-center gap-2 lg:gap-3 py-2 lg:py-3 border-b border-[#E2E8F0] last:border-0">
               <div className="text-xl lg:text-2xl">
                 {expense.is_group_fund_expense ? '📦' : '💸'}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-['var(--font-dm-sans)'] font-medium text-[#1A1208] text-sm lg:text-base truncate">
+                <p className="font-['var(--font-dm-sans)'] font-medium text-[#0F172A] text-sm lg:text-base truncate">
                   {expense.description}
                 </p>
-                <p className="text-xs text-[#6B5744] font-['var(--font-dm-sans)'] mt-0.5">
+                <p className="text-xs text-[#475569] font-['var(--font-dm-sans)'] mt-0.5">
                   {expense.is_group_fund_expense ? (
                     <span className="inline-flex items-center gap-1">
                       <span>Group Fund</span>
@@ -977,7 +982,7 @@ export default function GroupSummary({
                   })}
                 </p>
               </div>
-              <p className="font-['var(--font-playfair)'] font-semibold text-[#8B4513] text-base lg:text-lg whitespace-nowrap">
+              <p className="font-['var(--font-playfair)'] font-semibold text-[#047857] text-base lg:text-lg whitespace-nowrap">
                 {formatCurrency(expense.total_amount)}
               </p>
               {onDeleteExpense && (
@@ -990,7 +995,7 @@ export default function GroupSummary({
                   className="p-1.5 lg:p-2 hover:bg-red-50 rounded-lg transition-colors group flex-shrink-0"
                   title="Delete expense"
                 >
-                  <Trash2 className="w-4 h-4 text-[#6B5744] group-hover:text-red-600" />
+                  <Trash2 className="w-4 h-4 text-[#475569] group-hover:text-red-600" />
                 </button>
               )}
             </div>
@@ -999,13 +1004,13 @@ export default function GroupSummary({
 
         {expenses.length === 0 && (
           <div className="text-center py-8 lg:py-12">
-            <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-full bg-[#F5EFE6] flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-full bg-[#F1F5F9] flex items-center justify-center mx-auto mb-3">
               <span className="text-2xl lg:text-3xl">📝</span>
             </div>
-            <p className="text-[#6B5744] font-['var(--font-dm-sans)'] text-sm lg:text-base mb-1">
+            <p className="text-[#475569] font-['var(--font-dm-sans)'] text-sm lg:text-base mb-1">
               No expenses yet
             </p>
-            <p className="text-xs lg:text-sm text-[#A89880] font-['var(--font-dm-sans)']">
+            <p className="text-xs lg:text-sm text-[#94A3B8] font-['var(--font-dm-sans)']">
               Start adding expenses in the chat!
             </p>
           </div>

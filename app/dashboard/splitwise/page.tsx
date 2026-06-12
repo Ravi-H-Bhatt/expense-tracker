@@ -86,23 +86,23 @@ export default function SplitwisePage() {
   return (
     <div className="min-h-[calc(100vh-8rem)] flex flex-col lg:flex-row lg:rounded-2xl overflow-hidden lg:border border-border bg-card">
       {/* Left Panel - Group List (Mobile: Collapsible, Desktop: Fixed) */}
-      <div className="w-full lg:w-72 border-b lg:border-b-0 lg:border-r border-border bg-[#F5EFE6] flex flex-col lg:h-[calc(100vh-8rem)]">
+      <div className="w-full lg:w-72 border-b lg:border-b-0 lg:border-r border-border bg-[#F1F5F9] flex flex-col lg:h-[calc(100vh-8rem)]">
         {/* Header */}
         <div className="p-3 lg:p-4 border-b border-border">
           <div className="flex items-center justify-between mb-2 lg:mb-3">
-            <h2 className="text-lg lg:text-xl font-['var(--font-playfair)'] font-semibold text-[#1A1208]">
+            <h2 className="text-lg lg:text-xl font-['var(--font-playfair)'] font-semibold text-[#0F172A]">
               Groups
             </h2>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-2.5 lg:px-3 py-1.5 bg-[#8B4513] text-white text-xs lg:text-sm rounded-lg hover:bg-[#6B3410] transition-colors font-['var(--font-dm-sans)']"
+              className="px-2.5 lg:px-3 py-1.5 bg-[#047857] text-white text-xs lg:text-sm rounded-lg hover:bg-[#065F46] transition-colors font-['var(--font-dm-sans)']"
             >
               ＋ New
             </button>
           </div>
           <button
             onClick={() => setShowJoinModal(true)}
-            className="w-full px-3 py-2 border border-[#8B4513] text-[#8B4513] text-xs lg:text-sm rounded-lg hover:bg-[#8B4513] hover:text-white transition-colors font-['var(--font-dm-sans)']"
+            className="w-full px-3 py-2 border border-[#047857] text-[#047857] text-xs lg:text-sm rounded-lg hover:bg-[#047857] hover:text-white transition-colors font-['var(--font-dm-sans)']"
           >
             Join via link
           </button>
@@ -111,9 +111,9 @@ export default function SplitwisePage() {
         {/* Group List */}
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
-            <div className="p-4 text-center text-[#6B5744] text-sm">Loading groups...</div>
+            <div className="p-4 text-center text-[#475569] text-sm">Loading groups...</div>
           ) : groups.length === 0 ? (
-            <div className="p-4 lg:p-6 text-center text-[#6B5744]">
+            <div className="p-4 lg:p-6 text-center text-[#475569]">
               <p className="mb-2 font-['var(--font-dm-sans)'] text-sm">No groups yet.</p>
               <p className="text-xs">Create one or join via invite link.</p>
             </div>
@@ -128,7 +128,7 @@ export default function SplitwisePage() {
       </div>
 
       {/* Right Panel - Group Workspace */}
-      <div className="flex-1 bg-[#FAF7F2] lg:h-[calc(100vh-8rem)]">
+      <div className="flex-1 bg-[#F8FAFC] lg:h-[calc(100vh-8rem)]">
         {selectedGroupId ? (
           <GroupWorkspace 
             groupId={selectedGroupId} 
@@ -141,18 +141,18 @@ export default function SplitwisePage() {
         ) : (
           <div className="h-64 lg:h-full flex items-center justify-center p-4">
             <div className="text-center">
-              <div className="w-16 h-16 lg:w-24 lg:h-24 rounded-full bg-[#F5EFE6] flex items-center justify-center mx-auto mb-3 lg:mb-4">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#8B4513" strokeWidth="1.5" className="lg:w-12 lg:h-12">
+              <div className="w-16 h-16 lg:w-24 lg:h-24 rounded-full bg-[#F1F5F9] flex items-center justify-center mx-auto mb-3 lg:mb-4">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#047857" strokeWidth="1.5" className="lg:w-12 lg:h-12">
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                   <circle cx="9" cy="7" r="4" />
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                   <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
               </div>
-              <h3 className="text-lg lg:text-xl font-['var(--font-playfair)'] font-semibold text-[#1A1208] mb-1 lg:mb-2">
+              <h3 className="text-lg lg:text-xl font-['var(--font-playfair)'] font-semibold text-[#0F172A] mb-1 lg:mb-2">
                 Select a group to start
               </h3>
-              <p className="text-[#6B5744] font-['var(--font-dm-sans)'] text-sm">
+              <p className="text-[#475569] font-['var(--font-dm-sans)'] text-sm">
                 Choose a group from above or create a new one
               </p>
             </div>

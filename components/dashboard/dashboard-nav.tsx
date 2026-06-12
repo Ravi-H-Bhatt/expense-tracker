@@ -54,10 +54,17 @@ export default function DashboardNav({ user, profile }: DashboardNavProps) {
     }
   };
 
-  const initials = profile?.full_name
+  const displayName =
+    profile?.full_name ||
+    user?.user_metadata?.full_name ||
+    user?.email?.split('@')[0] ||
+    'User';
+
+  const initials = displayName
     ?.split(' ')
     .map((n: string) => n[0])
     .join('')
+    .slice(0, 2)
     .toUpperCase() || user.email[0].toUpperCase();
 
   return (
@@ -127,7 +134,7 @@ export default function DashboardNav({ user, profile }: DashboardNavProps) {
               </Avatar>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">
-                  {profile?.full_name || 'User'}
+                  {displayName}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
                   {user.email}

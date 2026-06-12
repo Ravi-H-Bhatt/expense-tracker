@@ -52,8 +52,17 @@ ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies
 DROP POLICY IF EXISTS "payment_requests_access" ON payment_requests;
+DROP POLICY IF EXISTS "payment_requests_select" ON payment_requests;
+DROP POLICY IF EXISTS "payment_requests_insert" ON payment_requests;
+DROP POLICY IF EXISTS "payment_requests_update" ON payment_requests;
 DROP POLICY IF EXISTS "settlements_access" ON settlements;
+DROP POLICY IF EXISTS "settlements_select" ON settlements;
+DROP POLICY IF EXISTS "settlements_insert" ON settlements;
+DROP POLICY IF EXISTS "settlements_update" ON settlements;
 DROP POLICY IF EXISTS "notifications_access" ON notifications;
+DROP POLICY IF EXISTS "notifications_select" ON notifications;
+DROP POLICY IF EXISTS "notifications_insert" ON notifications;
+DROP POLICY IF EXISTS "notifications_update" ON notifications;
 
 -- RLS Policies for Payment Requests
 CREATE POLICY "payment_requests_select" ON payment_requests FOR SELECT TO authenticated USING (
@@ -79,7 +88,7 @@ CREATE POLICY "settlements_select" ON settlements FOR SELECT TO authenticated US
 );
 
 CREATE POLICY "settlements_insert" ON settlements FOR INSERT TO authenticated WITH CHECK (
-  payer_id = auth.uid() AN
+  payer_id = auth.uid() AND
   group_id IN (SELECT group_id FROM group_members WHERE user_id = auth.uid())
 );
 
@@ -114,7 +123,21 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_status ON notifications(status);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
 
--- Enable realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE payment_requests;
-ALTER PUBLICATION supabase_realtime ADD TABLE settlements;
-ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+-- Enable realtime (safe if already added)
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE payment_requests;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE settlements;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
