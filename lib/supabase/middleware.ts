@@ -36,7 +36,13 @@ export async function updateSession(request: NextRequest) {
       !request.nextUrl.pathname.startsWith('/join/') &&
       request.nextUrl.pathname !== '/') {
     const url = request.nextUrl.clone()
+    const returnTo = request.nextUrl.pathname + request.nextUrl.search
     url.pathname = '/auth/login'
+    url.search = ''
+    // Preserve where the user was headed so login can send them back
+    if (returnTo && returnTo !== '/') {
+      url.searchParams.set('returnTo', returnTo)
+    }
     return NextResponse.redirect(url)
   }
 
