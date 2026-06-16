@@ -67,11 +67,26 @@ export async function POST(request: NextRequest) {
     // Resolve each member's email (admin) and send the wrap-up email.
     const results = await Promise.allSettled(
       members.map(async (m) => {
-        if (!m.user_id) return { sent: false, name: m.display_name };
+        if (!m.user_id) {
+          return { sent: false, name: m.display_name, reason: 'no-account' };
+        }
 
-        const { data: { user: memberUser } } = await adminClient.auth.admin.getUserById(m.user_id);
-        const email = memberUser?.email;
-        if (!email) return { sent: false, name: m.display_name };
+        let email: string | undefined;
+        try {
+          const { data, error } = await adminClient.auth.admin.getUserById(m.user_id);
+          if (error) {
+            console.error(`❌ getUserById failed for ${m.display_name}:`, error.message);
+            return { sent: false, name: m.display_name, reason: 'lookup-failed' };
+          }
+          email = data?.user?.email || undefined;
+        } catch (e: any) {
+          console.error(`❌ getUserById threw for ${m.display_name}:`, e?.message);
+          return { sent: false, name: m.display_name, reason: 'lookup-error' };
+        }
+
+        if (!email) {
+          return { sent: false, name: m.display_name, reason: 'no-email' };
+        }
 
         const sent = await sendTripEndedEmail({
           to: email,
@@ -85,20 +100,44 @@ export async function POST(request: NextRequest) {
           appUrl,
         });
 
-        return { sent, name: m.display_name, email };
+        return { sent, name: m.display_name, email, reason: sent ? 'ok' : 'send-failed' };
       })
     );
 
-    const sentCount = results.filter(
-      (r) => r.status === 'fulfilled' && (r.value as any)?.sent
+    const settled = results.map((r) =>
+      r.status === 'fulfilled' ? r.value : { sent: false, name: 'unknown', reason: 'rejected' }
+    );
+    const sentCount = settled.filter((r) => (r as any).sent).length;
+
+    // Aggregate reasons so the UI/logs can explain the 0/N case.
+    const reasons: Record<string, number> = {};
+    settled.forEach((r) => {
+      const reason = (r as any).reason || 'unknown';
+      reasons[reason] = (reasons[reason] || 0) + 1;
+    });
+    console.log('📊 End trip results:', { sentCount, memberCount, reasons });
+
+    const withEmail = settled.filter(
+      (r) => (r as any).reason === 'ok' || (r as any).reason === 'send-failed'
     ).length;
 
+    let message: string;
+    if (sentCount > 0) {
+      message = `Trip ended. Report emailed to ${sentCount} of ${memberCount} members.`;
+    } else if (withEmail === 0) {
+      message = `No emails sent: none of the ${memberCount} members have a registered account with an email address.`;
+    } else {
+      message = `Could not send emails (${withEmail} had addresses). Check SMTP configuration.`;
+    }
+
     return NextResponse.json({
-      success: true,
+      success: sentCount > 0,
       sentCount,
       totalMembers: memberCount,
+      membersWithEmail: withEmail,
+      reasons,
       perHeadShare,
-      message: `Trip ended. Report emailed to ${sentCount} of ${memberCount} members.`,
+      message,
     });
   } catch (error: any) {
     console.error('❌ End trip error:', error);

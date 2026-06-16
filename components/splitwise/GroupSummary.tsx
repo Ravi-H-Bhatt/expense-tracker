@@ -490,6 +490,9 @@ export default function GroupSummary({
 
       if (response.ok && result.success) {
         toast.success(result.message || `Trip ended — report emailed to ${result.sentCount} members.`);
+      } else if (response.ok) {
+        // Request worked but nothing was sent — surface the real reason.
+        toast.warning(result.message || 'Trip ended, but no emails could be sent.');
       } else {
         toast.error(result.error || 'Failed to end trip and send emails.');
       }
