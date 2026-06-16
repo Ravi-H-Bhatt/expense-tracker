@@ -154,7 +154,7 @@ export default function GroupWorkspace({ groupId, currentUser, onGroupDeleted }:
     balances: {}
   });
 
-  const [activeTab, setActiveTab] = useState<'chat' | 'summary'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'summary'>('summary');
   const [messageInput, setMessageInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);

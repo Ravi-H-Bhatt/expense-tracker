@@ -127,7 +127,7 @@ export class SplitwisePDFGenerator {
     this.currentY += 15;
   }
 
-  private drawTable(headers: string[], data: any[][], columnStyles: any = {}) {
+  private drawTable(headers: string[], data: any[][], columnStyles: any = {}, opts: { headFontSize?: number; bodyFontSize?: number; cellPadding?: number } = {}) {
     autoTable(this.doc, {
       startY: this.currentY,
       head: [headers],
@@ -136,15 +136,15 @@ export class SplitwisePDFGenerator {
       headStyles: {
         fillColor: COLORS.primary,
         textColor: COLORS.white,
-        fontSize: 11,
+        fontSize: opts.headFontSize ?? 11,
         fontStyle: 'bold',
         halign: 'center',
-        cellPadding: 5
+        cellPadding: opts.cellPadding ?? 5
       },
       bodyStyles: {
         textColor: COLORS.text,
-        fontSize: 10,
-        cellPadding: 4
+        fontSize: opts.bodyFontSize ?? 10,
+        cellPadding: opts.cellPadding ?? 4
       },
       alternateRowStyles: {
         fillColor: [250, 245, 240]
@@ -162,46 +162,77 @@ export class SplitwisePDFGenerator {
   }
 
   private drawProgressBar(label: string, percentage: number, amount: string, y: number, color: [number, number, number] = COLORS.primary) {
-    const barWidth = this.pageWidth - 2 * this.margin - 60;
-    const barHeight = 8;
-    const startX = this.margin + 60;
+    // Layout columns (all values in mm):
+    //   [ label ][ bar track ][ % ][ amount (right-aligned) ]
+    const labelWidth = 42;          // room for member / category name
+    const pctWidth = 14;            // room for "100.0%"
+    const amountWidth = 30;         // room for "Rs. 1,23,456"
+    const gap = 3;
+    const startX = this.margin + labelWidth;
+    const rightEdge = this.pageWidth - this.margin;
+    const barWidth = rightEdge - startX - pctWidth - amountWidth - gap;
+    const barHeight = 6.5;
+    const safePct = Math.max(0, Math.min(percentage, 100));
+    const textBaseline = y + barHeight - 1; // vertically align text with the bar
 
-    this.doc.setFontSize(10);
+    // Label (truncate defensively so it never collides with the bar)
+    let safeLabel = label;
+    if (this.doc.getTextWidth(safeLabel) > labelWidth - 2) {
+      while (safeLabel.length > 1 && this.doc.getTextWidth(safeLabel + '...') > labelWidth - 2) {
+        safeLabel = safeLabel.slice(0, -1);
+      }
+      safeLabel = safeLabel + '...';
+    }
+    this.doc.setFontSize(9.5);
     this.doc.setFont('helvetica', 'normal');
     this.doc.setTextColor(...COLORS.text);
-    this.doc.text(label, this.margin, y + 5);
+    this.doc.text(safeLabel, this.margin, textBaseline);
 
-    this.doc.setFillColor(230, 230, 230);
-    this.doc.roundedRect(startX, y, barWidth, barHeight, 2, 2, 'F');
+    // Background track
+    this.doc.setFillColor(232, 236, 239);
+    this.doc.roundedRect(startX, y, barWidth, barHeight, 1.5, 1.5, 'F');
 
-    const fillWidth = (barWidth * Math.min(percentage, 100)) / 100;
-    this.doc.setFillColor(...color);
-    this.doc.roundedRect(startX, y, fillWidth, barHeight, 2, 2, 'F');
+    // Filled portion
+    const fillWidth = (barWidth * safePct) / 100;
+    if (fillWidth > 0.5) {
+      this.doc.setFillColor(...color);
+      this.doc.roundedRect(startX, y, Math.max(fillWidth, 1.5), barHeight, 1.5, 1.5, 'F');
+    }
 
-    this.doc.setFontSize(9);
+    // Percentage immediately after the bar
+    this.doc.setFontSize(8.5);
     this.doc.setFont('helvetica', 'bold');
     this.doc.setTextColor(...COLORS.primary);
-    this.doc.text(`${percentage.toFixed(1)}%`, startX + barWidth + 3, y + 5);
+    this.doc.text(`${safePct.toFixed(1)}%`, startX + barWidth + gap, textBaseline);
+
+    // Amount right-aligned to the page margin so it never clips off-page
     this.doc.setFont('helvetica', 'normal');
-    this.doc.text(amount, startX + barWidth + 15, y + 5);
+    this.doc.setTextColor(...COLORS.textLight);
+    this.doc.text(amount, rightEdge, textBaseline, { align: 'right' });
   }
 
   private drawMiniBarChart(data: { label: string; value: number; max: number; color?: [number, number, number] }[], title: string) {
-    this.checkPageBreak(60);
+    this.checkPageBreak(30);
     this.drawSectionHeader(title);
 
-    data.forEach((item, index) => {
-      const y = this.currentY + index * 12;
+    const rowHeight = 10;
+    data.forEach((item) => {
+      // Per-row page break so bars never overlap the footer
+      if (this.currentY + rowHeight > this.pageHeight - 22) {
+        this.addPage();
+      }
+      const pct = item.max > 0 ? (item.value / item.max) * 100 : 0;
       this.drawProgressBar(
-        item.label, 
-        (item.value / item.max) * 100, 
-        this.formatCurrency(item.value), 
-        y,
+        item.label,
+        pct,
+        this.formatCurrency(item.value),
+        this.currentY,
         item.color || COLORS.primary
       );
+      this.currentY += rowHeight;
     });
 
-    this.currentY += data.length * 12 + 10;
+    this.currentY += 8;
   }
 
   private formatCurrency(amount: number): string {
@@ -303,6 +334,67 @@ export class SplitwisePDFGenerator {
     );
   }
 
+  // Show how the pooled group fund splits equally across every member, so each
+  // person can see exactly how much of the shared spend is theirs.
+  private drawGroupFundShare(memberCount: number, groupFundSpent?: number, expenses?: any[], groupFundRemaining?: number) {
+    const fundSpent =
+      typeof groupFundSpent === 'number'
+        ? groupFundSpent
+        : (expenses || [])
+            .filter(e => e.is_group_fund_expense)
+            .reduce((sum, e) => sum + Number(e.total_amount), 0);
+
+    const remaining = typeof groupFundRemaining === 'number' ? groupFundRemaining : 0;
+    // Total pooled = what's still in the fund + what was spent from it.
+    const totalPool = remaining + fundSpent;
+
+    if (totalPool <= 0 || memberCount <= 0) return;
+
+    const perHeadTotal = totalPool / memberCount;
+    const perHeadSpent = fundSpent / memberCount;
+
+    this.checkPageBreak(46);
+    this.drawSectionHeader('Group Fund — Equal Share per Person');
+
+    // Headline panel
+    const panelH = fundSpent > 0 ? 34 : 26;
+    this.doc.setFillColor(...COLORS.bg);
+    this.doc.setDrawColor(...COLORS.secondary);
+    this.doc.setLineWidth(0.4);
+    this.doc.roundedRect(this.margin, this.currentY, this.pageWidth - 2 * this.margin, panelH, 3, 3, 'FD');
+
+    this.doc.setFontSize(10);
+    this.doc.setFont('helvetica', 'normal');
+    this.doc.setTextColor(...COLORS.textLight);
+    this.doc.text(
+      `${this.formatCurrency(totalPool)} pooled across ${memberCount} members — divided equally.`,
+      this.margin + 6,
+      this.currentY + 10
+    );
+
+    this.doc.setFontSize(15);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.setTextColor(...COLORS.primary);
+    this.doc.text(
+      `Each person's share: ${this.formatCurrency(perHeadTotal)}`,
+      this.margin + 6,
+      this.currentY + 20
+    );
+
+    if (fundSpent > 0) {
+      this.doc.setFontSize(9.5);
+      this.doc.setFont('helvetica', 'normal');
+      this.doc.setTextColor(...COLORS.textLight);
+      this.doc.text(
+        `Of that, ${this.formatCurrency(perHeadSpent)} per person has been spent from the fund so far.`,
+        this.margin + 6,
+        this.currentY + 29
+      );
+    }
+
+    this.currentY += panelH + 8;
+  }
+
   private addFooters(reportType: string) {
     const pageCount = this.doc.internal.pages.length - 1;
     
@@ -336,6 +428,7 @@ export class SplitwisePDFGenerator {
     members: MemberExpense[];
     totalSpent: number;
     groupFund: number;
+    groupFundSpent?: number;      // total spent FROM the pooled fund in this period
     categoryBreakdown: { category: string; amount: number }[];
   }) {
     this.drawHeader('Group Expense Report', `${data.groupName}`);
@@ -380,13 +473,18 @@ export class SplitwisePDFGenerator {
       this.drawInsightsPanel(insights);
     }
 
+    // Group Fund — equal per-person share.
+    // The pooled fund is shared equally by everyone, so each member's share of
+    // the fund (collected and spent) is simply (amount / number of members).
+    this.drawGroupFundShare(data.members.length, data.groupFundSpent, data.expenses, data.groupFund);
+
     // Member contribution analysis
     if (data.members.length > 0) {
       const maxPaid = Math.max(...data.members.map(m => m.paid));
       const memberData = data.members
         .sort((a, b) => b.paid - a.paid)
         .map(m => ({
-          label: m.name.length > 15 ? m.name.substring(0, 15) + '...' : m.name,
+          label: m.name,
           value: m.paid,
           max: maxPaid,
           color: m.paid > 0 ? COLORS.success : COLORS.textLight
@@ -400,11 +498,25 @@ export class SplitwisePDFGenerator {
       this.checkPageBreak(40);
       this.drawSectionHeader('Balance Sheet', '💰');
 
+      // Each member's equal share of the pooled group fund (collected + spent).
+      const fundSpentTotal =
+        typeof data.groupFundSpent === 'number'
+          ? data.groupFundSpent
+          : data.expenses
+              .filter((e: any) => e.is_group_fund_expense)
+              .reduce((sum: number, e: any) => sum + Number(e.total_amount), 0);
+      const fundPool = (data.groupFund || 0) + fundSpentTotal;
+      const perHeadFund = data.members.length > 0 ? fundPool / data.members.length : 0;
+
       const balanceData = data.members.map(m => {
-        const status = m.net === 0 ? '✓ Settled' : m.net > 0 ? `↑ Gets Back` : `↓ Owes`;
+        const status = m.net === 0 ? 'Settled' : m.net > 0 ? 'Gets Back' : 'Owes';
+        // Total spent by this person = their group-fund share + what they paid out of pocket.
+        const totalSpent = perHeadFund + m.paid;
         return [
           m.name,
+          this.formatCurrency(perHeadFund),
           this.formatCurrency(m.paid),
+          this.formatCurrency(totalSpent),
           this.formatCurrency(m.owes),
           this.formatCurrency(Math.abs(m.net)),
           status
@@ -412,15 +524,18 @@ export class SplitwisePDFGenerator {
       });
 
       this.drawTable(
-        ['Member', 'Paid', 'Owes', 'Net Balance', 'Status'],
+        ['Member', 'Group Fund', 'Paid', 'Total Spent', 'Owes', 'Net Balance', 'Status'],
         balanceData,
         {
-          0: { halign: 'left', cellWidth: 45 },
-          1: { halign: 'right', cellWidth: 35, textColor: COLORS.success },
-          2: { halign: 'right', cellWidth: 35, textColor: COLORS.danger },
-          3: { halign: 'right', cellWidth: 35, fontStyle: 'bold' },
-          4: { halign: 'center', cellWidth: 30 }
-        }
+          0: { halign: 'left', cellWidth: 32 },
+          1: { halign: 'right', cellWidth: 24, textColor: COLORS.primary },
+          2: { halign: 'right', cellWidth: 22, textColor: COLORS.success },
+          3: { halign: 'right', cellWidth: 26, fontStyle: 'bold', textColor: COLORS.text },
+          4: { halign: 'right', cellWidth: 22, textColor: COLORS.danger },
+          5: { halign: 'right', cellWidth: 24, fontStyle: 'bold' },
+          6: { halign: 'center', cellWidth: 20 }
+        },
+        { headFontSize: 9.5, bodyFontSize: 9, cellPadding: 3.5 }
       );
 
       // Settlement plan — who pays whom to clear all debts
@@ -577,6 +692,21 @@ export class SplitwisePDFGenerator {
 
   save(filename: string) {
     this.doc.save(filename);
+  }
+
+  // Return the PDF as an ArrayBuffer (browser/client) — handy for uploads.
+  outputArrayBuffer(): ArrayBuffer {
+    return this.doc.output('arraybuffer');
+  }
+
+  // Return the PDF as a Node Buffer — used server-side for email attachments.
+  outputBuffer(): Buffer {
+    return Buffer.from(this.doc.output('arraybuffer'));
+  }
+
+  // Return the PDF as a base64 string — used to ship the report to an API route.
+  outputBase64(): string {
+    return this.doc.output('datauristring').split(',')[1] || '';
   }
 }
 

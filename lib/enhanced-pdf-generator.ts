@@ -152,46 +152,71 @@ export class EnhancedPDFGenerator {
   }
 
   private drawProgressBar(label: string, percentage: number, amount: string, y: number) {
-    const barWidth = this.pageWidth - 2 * this.margin - 60;
-    const barHeight = 8;
-    const startX = this.margin + 60;
+    // Layout columns: [ label ][ bar track ][ % ][ amount (right-aligned) ]
+    const labelWidth = 42;
+    const pctWidth = 14;
+    const amountWidth = 30;
+    const gap = 3;
+    const startX = this.margin + labelWidth;
+    const rightEdge = this.pageWidth - this.margin;
+    const barWidth = rightEdge - startX - pctWidth - amountWidth - gap;
+    const barHeight = 6.5;
+    const safePct = Math.max(0, Math.min(percentage, 100));
+    const textBaseline = y + barHeight - 1;
 
-    // Label
-    this.doc.setFontSize(10);
+    // Label (truncate defensively)
+    let safeLabel = label;
+    if (this.doc.getTextWidth(safeLabel) > labelWidth - 2) {
+      while (safeLabel.length > 1 && this.doc.getTextWidth(safeLabel + '...') > labelWidth - 2) {
+        safeLabel = safeLabel.slice(0, -1);
+      }
+      safeLabel = safeLabel + '...';
+    }
+    this.doc.setFontSize(9.5);
     this.doc.setFont('helvetica', 'normal');
     this.doc.setTextColor(...COLORS.text);
-    this.doc.text(label, this.margin, y + 5);
+    this.doc.text(safeLabel, this.margin, textBaseline);
 
-    // Background bar
-    this.doc.setFillColor(230, 230, 230);
-    this.doc.roundedRect(startX, y, barWidth, barHeight, 2, 2, 'F');
+    // Background track
+    this.doc.setFillColor(232, 236, 239);
+    this.doc.roundedRect(startX, y, barWidth, barHeight, 1.5, 1.5, 'F');
 
     // Progress bar
-    const fillWidth = (barWidth * percentage) / 100;
+    const fillWidth = (barWidth * safePct) / 100;
     const color: [number, number, number] = percentage > 66 ? COLORS.success : percentage > 33 ? [245, 158, 11] : COLORS.danger;
-    this.doc.setFillColor(...color);
-    this.doc.roundedRect(startX, y, fillWidth, barHeight, 2, 2, 'F');
+    if (fillWidth > 0.5) {
+      this.doc.setFillColor(...color);
+      this.doc.roundedRect(startX, y, Math.max(fillWidth, 1.5), barHeight, 1.5, 1.5, 'F');
+    }
 
-    // Percentage and amount
-    this.doc.setFontSize(9);
+    // Percentage immediately after the bar
+    this.doc.setFontSize(8.5);
     this.doc.setFont('helvetica', 'bold');
     this.doc.setTextColor(...COLORS.primary);
-    this.doc.text(`${percentage.toFixed(1)}%`, startX + barWidth + 3, y + 5);
+    this.doc.text(`${safePct.toFixed(1)}%`, startX + barWidth + gap, textBaseline);
+
+    // Amount right-aligned to the page margin
     this.doc.setFont('helvetica', 'normal');
-    this.doc.text(amount, startX + barWidth + 15, y + 5);
+    this.doc.setTextColor(...COLORS.textLight);
+    this.doc.text(amount, rightEdge, textBaseline, { align: 'right' });
   }
 
   // Draw mini chart (text-based)
   private drawMiniBarChart(data: { label: string; value: number; max: number }[], title: string) {
-    this.checkPageBreak(60);
+    this.checkPageBreak(30);
     this.drawSectionHeader(title);
 
-    data.forEach((item, index) => {
-      const y = this.currentY + index * 12;
-      this.drawProgressBar(item.label, (item.value / item.max) * 100, this.formatCurrency(item.value), y);
+    const rowHeight = 10;
+    data.forEach((item) => {
+      if (this.currentY + rowHeight > this.pageHeight - 22) {
+        this.addPage();
+      }
+      const pct = item.max > 0 ? (item.value / item.max) * 100 : 0;
+      this.drawProgressBar(item.label, pct, this.formatCurrency(item.value), this.currentY);
+      this.currentY += rowHeight;
     });
 
-    this.currentY += data.length * 12 + 10;
+    this.currentY += 8;
   }
 
   // Format currency — use "Rs." since core PDF fonts lack the rupee glyph

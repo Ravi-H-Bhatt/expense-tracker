@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Trash2, Download, Calendar } from 'lucide-react';
 import { SplitwisePDFGenerator } from '@/lib/splitwise-pdf-generator';
 import { resolveDisplayName } from '@/lib/display-name';
+import { buildCategoryBreakdown, categorizeExpense } from '@/lib/expense-category';
 
 interface GroupSummaryProps {
   group: any;
@@ -40,6 +41,11 @@ export default function GroupSummary({
   const [reportType, setReportType] = useState<'monthly' | 'yearly'>('monthly');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [isEndingTrip, setIsEndingTrip] = useState(false);
+
+  // Owner-only feature gate for "End Trip".
+  const OWNER_EMAIL = 'ravibhatt946@gmail.com';
+  const isOwner = (currentUser?.email || '').toLowerCase() === OWNER_EMAIL;
 
   useEffect(() => {
     if (currentUser?.id) {
@@ -393,21 +399,7 @@ export default function GroupSummary({
   // Calculate category breakdown for bar chart
   const categoryMap: Record<string, number> = {};
   expenses.forEach(exp => {
-    const desc = exp.description.toLowerCase();
-    let category = 'Other';
-    
-    if (desc.includes('food') || desc.includes('dinner') || desc.includes('lunch') || desc.includes('breakfast')) {
-      category = 'Food';
-    } else if (desc.includes('transport') || desc.includes('uber') || desc.includes('taxi') || desc.includes('cab')) {
-      category = 'Transport';
-    } else if (desc.includes('shop') || desc.includes('clothes') || desc.includes('shopping')) {
-      category = 'Shopping';
-    } else if (desc.includes('movie') || desc.includes('entertainment') || desc.includes('fun')) {
-      category = 'Entertainment';
-    } else if (desc.includes('grocery') || desc.includes('groceries')) {
-      category = 'Groceries';
-    }
-    
+    const category = categorizeExpense(exp.description);
     categoryMap[category] = (categoryMap[category] || 0) + Number(exp.total_amount);
   });
 
@@ -415,6 +407,99 @@ export default function GroupSummary({
     name,
     value
   }));
+
+  // Build a complete-trip PDF report (all expenses, all-time) for the group and
+  // return it as a base64 string so it can be emailed from the server.
+  const buildFullTripReport = (): { base64: string; filename: string; totalSpent: number; groupFundSpent: number; groupFundRemaining: number } | null => {
+    if (expenses.length === 0) {
+      toast.error('No expenses yet — nothing to report.');
+      return null;
+    }
+
+    const pdfGen = new SplitwisePDFGenerator();
+
+    const totalSpent = expenses.reduce((sum, e) => sum + Number(e.total_amount), 0);
+    const groupFundSpent = expenses
+      .filter((e: any) => e.is_group_fund_expense)
+      .reduce((sum: number, e: any) => sum + Number(e.total_amount), 0);
+
+    // Category breakdown across the whole trip.
+    const categoryBreakdown = buildCategoryBreakdown(expenses);
+
+    const memberBalances = Object.entries(balances).map(([name, data]: [string, any]) => ({
+      name,
+      paid: data.paid,
+      owes: data.owes,
+      net: data.net,
+    }));
+
+    pdfGen.generateMonthlyGroupReport({
+      groupName: group.name,
+      month: 'Full Trip',
+      year: new Date().getFullYear().toString(),
+      expenses,
+      members: memberBalances,
+      totalSpent,
+      groupFund: group.group_fund || 0,
+      groupFundSpent,
+      categoryBreakdown,
+    });
+
+    const filename = `${group.name.replace(/[^a-z0-9]/gi, '_')}_Trip_Report.pdf`;
+    return {
+      base64: pdfGen.outputBase64(),
+      filename,
+      totalSpent,
+      groupFundSpent,
+      groupFundRemaining: group.group_fund || 0,
+    };
+  };
+
+  const handleEndTrip = async () => {
+    if (isEndingTrip) return;
+    if (!groupId) {
+      toast.error('Cannot end trip — missing group.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `End the trip for "${group.name}"?\n\nThis emails every member a wrap-up with the full report attached. (Testing email — not a payment reminder.)`
+    );
+    if (!confirmed) return;
+
+    setIsEndingTrip(true);
+    try {
+      const report = buildFullTripReport();
+      if (!report) return;
+
+      const response = await fetch('/api/trips/end', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          groupId,
+          groupName: group.name,
+          pdfBase64: report.base64,
+          filename: report.filename,
+          totalSpent: report.totalSpent,
+          groupFundSpent: report.groupFundSpent,
+          groupFundRemaining: report.groupFundRemaining,
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (response.ok && result.success) {
+        toast.success(result.message || `Trip ended — report emailed to ${result.sentCount} members.`);
+      } else {
+        toast.error(result.error || 'Failed to end trip and send emails.');
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to end trip.');
+      console.error('End trip failed:', error);
+    } finally {
+      setIsEndingTrip(false);
+    }
+  };
 
   const handleExportReport = () => {
     try {
@@ -437,30 +522,7 @@ export default function GroupSummary({
         const totalSpent = filteredExpenses.reduce((sum, e) => sum + Number(e.total_amount), 0);
 
         // Calculate category breakdown
-        const categoryMap: Record<string, number> = {};
-        filteredExpenses.forEach(exp => {
-          const desc = exp.description.toLowerCase();
-          let category = 'Other';
-          
-          if (desc.includes('food') || desc.includes('dinner') || desc.includes('lunch')) {
-            category = 'Food';
-          } else if (desc.includes('transport') || desc.includes('uber') || desc.includes('taxi')) {
-            category = 'Transport';
-          } else if (desc.includes('shop')) {
-            category = 'Shopping';
-          } else if (desc.includes('movie') || desc.includes('entertainment')) {
-            category = 'Entertainment';
-          } else if (desc.includes('grocery')) {
-            category = 'Groceries';
-          }
-          
-          categoryMap[category] = (categoryMap[category] || 0) + Number(exp.total_amount);
-        });
-
-        const categoryBreakdown = Object.entries(categoryMap).map(([category, amount]) => ({
-          category,
-          amount
-        })).sort((a, b) => b.amount - a.amount);
+        const categoryBreakdown = buildCategoryBreakdown(filteredExpenses);
 
         const memberBalances = Object.entries(balances).map(([name, data]: [string, any]) => ({
           name,
@@ -477,6 +539,9 @@ export default function GroupSummary({
           members: memberBalances,
           totalSpent,
           groupFund: group.group_fund || 0,
+          groupFundSpent: filteredExpenses
+            .filter((e: any) => e.is_group_fund_expense)
+            .reduce((sum: number, e: any) => sum + Number(e.total_amount), 0),
           categoryBreakdown
         });
 
@@ -510,30 +575,7 @@ export default function GroupSummary({
         const totalAmount = yearExpenses.reduce((sum, e) => sum + Number(e.total_amount), 0);
 
         // Category breakdown for year
-        const categoryMap: Record<string, number> = {};
-        yearExpenses.forEach(exp => {
-          const desc = exp.description.toLowerCase();
-          let category = 'Other';
-          
-          if (desc.includes('food') || desc.includes('dinner') || desc.includes('lunch')) {
-            category = 'Food';
-          } else if (desc.includes('transport') || desc.includes('uber') || desc.includes('taxi')) {
-            category = 'Transport';
-          } else if (desc.includes('shop')) {
-            category = 'Shopping';
-          } else if (desc.includes('movie') || desc.includes('entertainment')) {
-            category = 'Entertainment';
-          } else if (desc.includes('grocery')) {
-            category = 'Groceries';
-          }
-          
-          categoryMap[category] = (categoryMap[category] || 0) + Number(exp.total_amount);
-        });
-
-        const categoryBreakdown = Object.entries(categoryMap).map(([category, amount]) => ({
-          category,
-          amount
-        })).sort((a, b) => b.amount - a.amount);
+        const categoryBreakdown = buildCategoryBreakdown(yearExpenses);
 
         const memberBalances = Object.entries(balances).map(([name, data]: [string, any]) => ({
           name,
@@ -583,13 +625,25 @@ export default function GroupSummary({
               Export Monthly Report
             </h3>
           </div>
-          <button
-            onClick={() => setShowExportMenu(!showExportMenu)}
-            className="press px-4 py-2 bg-[#047857] text-white rounded-lg hover:bg-[#065F46] transition-colors text-sm font-['var(--font-dm-sans)'] font-medium flex items-center gap-2"
-          >
-            <Calendar className="w-4 h-4" />
-            Export PDF
-          </button>
+          <div className="flex items-center gap-2">
+            {isOwner && (
+              <button
+                onClick={handleEndTrip}
+                disabled={isEndingTrip}
+                title="End the trip and email everyone the final report"
+                className="press px-4 py-2 bg-gradient-to-r from-[#F59E0B] to-[#D97706] text-white rounded-lg hover:from-[#D97706] hover:to-[#B45309] transition-colors text-sm font-['var(--font-dm-sans)'] font-medium flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isEndingTrip ? '✈️ Ending…' : '🧳 End Trip'}
+              </button>
+            )}
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="press px-4 py-2 bg-[#047857] text-white rounded-lg hover:bg-[#065F46] transition-colors text-sm font-['var(--font-dm-sans)'] font-medium flex items-center gap-2"
+            >
+              <Calendar className="w-4 h-4" />
+              Export PDF
+            </button>
+          </div>
         </div>
 
         {showExportMenu && (

@@ -13,10 +13,22 @@ const SMTP_FROM = process.env.SMTP_FROM || 'noreply@rfin.app';
 
 const DEFAULT_APP_URL = 'https://expense-tracker-ravibhatt.vercel.app';
 
+interface EmailAttachment {
+  filename: string;
+  content: Buffer | string; // Buffer or base64 string
+  encoding?: string;        // e.g. 'base64'
+  contentType?: string;     // e.g. 'application/pdf'
+}
+
 interface EmailPayload {
   to: string;
   subject: string;
   html: string;
+  text?: string;                    // plain-text alternative — boosts deliverability
+  attachments?: EmailAttachment[];
+  replyTo?: string;
+  fromName?: string;                // overrides the default "RFin" display name
+  headers?: Record<string, string>; // extra headers (e.g. List-Unsubscribe)
 }
 
 // Create reusable transporter
@@ -130,6 +142,29 @@ function amountBlock(amount: number, label: string, accent: string): string {
 }
 
 /**
+ * Strip HTML to a readable plain-text fallback. A multipart email that has
+ * BOTH html and text is far less likely to be flagged as spam, and Gmail is
+ * more likely to file it under Primary.
+ */
+function htmlToText(html: string): string {
+  return String(html)
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<head[\s\S]*?<\/head>/gi, '')
+    .replace(/<\/(p|div|tr|li|h[1-6])>/gi, '\n')
+    .replace(/<br\s*\/?>(?=)/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+/**
  * Send email using SMTP
  */
 export async function sendEmail(payload: EmailPayload): Promise<boolean> {
@@ -146,11 +181,30 @@ export async function sendEmail(payload: EmailPayload): Promise<boolean> {
   try {
     const transport = getTransporter();
 
+    // A real "from" address that matches the authenticated SMTP user keeps
+    // Gmail/Outlook from rewriting the sender or junking the message.
+    const fromAddress = SMTP_FROM || SMTP_USER;
+    const fromName = payload.fromName || 'RFin Expense Tracker';
+
     const info = await transport.sendMail({
-      from: `"RFin" <${SMTP_FROM}>`,
+      from: `"${fromName}" <${fromAddress}>`,
+      sender: fromAddress,
+      replyTo: payload.replyTo || fromAddress,
       to: payload.to,
       subject: payload.subject,
       html: payload.html,
+      // Always include a plain-text part for deliverability / Primary placement.
+      text: payload.text || htmlToText(payload.html),
+      attachments: payload.attachments,
+      headers: {
+        // Mark as a personal/transactional message rather than bulk.
+        'X-Entity-Ref-ID': `rfin-${Date.now()}`,
+        'X-Priority': '3',
+        'X-Mailer': 'RFin Expense Tracker',
+        'List-Unsubscribe': `<mailto:${fromAddress}?subject=unsubscribe>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        ...(payload.headers || {}),
+      },
     });
 
     console.log('✅✅✅ EMAIL SENT SUCCESSFULLY ✅✅✅');
@@ -294,5 +348,151 @@ export async function sendSettlementPendingEmail(
     to: payeeEmail,
     subject: `Confirm receipt: ${fmt(amount)} from ${payerName} in ${groupName}`,
     html,
+  });
+}
+
+/**
+ * Send "Trip Ended" wrap-up email to a group member, with the full PDF report
+ * attached. This is intentionally warm and celebratory — NOT a payment reminder.
+ *
+ * A bold, unmissable note states this is a testing email and not a payment
+ * reminder, per the product requirement.
+ */
+export async function sendTripEndedEmail(opts: {
+  to: string;
+  recipientName: string;
+  groupName: string;
+  totalSpent: number;
+  memberCount: number;
+  perHeadShare: number;       // group-fund share per person (totalSpent / members)
+  yourContribution?: number;  // how much this member personally paid (optional)
+  reportFilename: string;
+  reportBuffer: Buffer;
+  appUrl?: string;
+}): Promise<boolean> {
+  const {
+    to,
+    recipientName,
+    groupName,
+    totalSpent,
+    memberCount,
+    perHeadShare,
+    yourContribution,
+    reportFilename,
+    reportBuffer,
+    appUrl = DEFAULT_APP_URL,
+  } = opts;
+
+  // Bold testing banner — required.
+  const testingBanner = `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;">
+      <tr>
+        <td style="background:#FEF3C7;border:2px solid #F59E0B;border-radius:14px;padding:16px 18px;">
+          <p style="margin:0;color:#92400E;font-size:15px;font-weight:800;line-height:1.5;">
+            ⚠️ IMPORTANT: This is a TESTING email — NOT a payment reminder.
+          </p>
+          <p style="margin:6px 0 0;color:#B45309;font-size:13px;font-weight:600;line-height:1.5;">
+            No money is due from this message. It's just a wrap-up of the trip with your report attached.
+          </p>
+        </td>
+      </tr>
+    </table>`;
+
+  const statsRow = `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0;">
+      <tr>
+        <td width="33%" style="padding:6px;">
+          <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:14px;padding:16px 10px;text-align:center;">
+            <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#059669;font-weight:700;">Total Spent</div>
+            <div style="font-size:20px;font-weight:800;color:#047857;margin-top:4px;">${fmt(totalSpent)}</div>
+          </div>
+        </td>
+        <td width="33%" style="padding:6px;">
+          <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:14px;padding:16px 10px;text-align:center;">
+            <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#059669;font-weight:700;">Members</div>
+            <div style="font-size:20px;font-weight:800;color:#047857;margin-top:4px;">${memberCount}</div>
+          </div>
+        </td>
+        <td width="33%" style="padding:6px;">
+          <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:14px;padding:16px 10px;text-align:center;">
+            <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#059669;font-weight:700;">Per Person</div>
+            <div style="font-size:20px;font-weight:800;color:#047857;margin-top:4px;">${fmt(perHeadShare)}</div>
+          </div>
+        </td>
+      </tr>
+    </table>`;
+
+  const contributionLine =
+    typeof yourContribution === 'number'
+      ? `<p style="margin:0 0 16px;">Your recorded contribution this trip: <strong style="color:#047857;">${fmt(yourContribution)}</strong>.</p>`
+      : '';
+
+  const body = `
+    ${testingBanner}
+    <p style="margin:0 0 16px;">Hi <strong>${esc(recipientName)}</strong>,</p>
+    <p style="margin:0 0 4px;">
+      That's a wrap on <strong>"${esc(groupName)}"</strong>! 🎉 Here's the final summary of everything
+      the group spent together.
+    </p>
+    ${statsRow}
+    <p style="margin:0 0 8px;">
+      Split evenly, that works out to <strong style="color:#047857;">${fmt(perHeadShare)}</strong> per person
+      across all ${memberCount} members — so you can see exactly what your share of the trip came to.
+    </p>
+    ${contributionLine}
+    <p style="margin:0 0 16px;">
+      The complete report (member contributions, balance sheet, settlement plan and every expense)
+      is attached as a PDF: <strong>${esc(reportFilename)}</strong>.
+    </p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 4px;">
+      <tr>
+        <td style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:12px;padding:16px 18px;color:#047857;font-weight:700;font-size:16px;text-align:center;">
+          🥂 Cheers to more such trips together! 🥂
+        </td>
+      </tr>
+    </table>`;
+
+  const html = renderEmail({
+    preheader: `Trip wrap-up for ${groupName} — your report is attached (testing email, not a payment reminder)`,
+    accent: '#10B981',
+    accentDark: '#047857',
+    icon: '🧳',
+    heading: `Trip ended: ${esc(groupName)}`,
+    bodyHtml: body,
+    ctaLabel: 'Open RFin',
+    ctaUrl: `${appUrl}/dashboard/splitwise`,
+  });
+
+  const text = [
+    'IMPORTANT: This is a TESTING email — NOT a payment reminder. No money is due.',
+    '',
+    `Hi ${recipientName},`,
+    '',
+    `That's a wrap on "${groupName}"!`,
+    `Total spent: ${fmt(totalSpent)}`,
+    `Members: ${memberCount}`,
+    `Per person (even split): ${fmt(perHeadShare)}`,
+    typeof yourContribution === 'number' ? `Your contribution: ${fmt(yourContribution)}` : '',
+    '',
+    `The full report is attached as ${reportFilename}.`,
+    '',
+    'Cheers to more such trips together!',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return sendEmail({
+    to,
+    subject: `🧳 Trip wrap-up: ${groupName} (testing email — not a payment reminder)`,
+    html,
+    text,
+    fromName: 'RFin Trips',
+    attachments: [
+      {
+        filename: reportFilename,
+        content: reportBuffer,
+        contentType: 'application/pdf',
+      },
+    ],
   });
 }
