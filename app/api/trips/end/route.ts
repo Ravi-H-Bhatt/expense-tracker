@@ -6,6 +6,10 @@ import { NextRequest, NextResponse } from 'next/server';
 // Only this owner may end a trip and email everyone.
 const OWNER_EMAIL = 'ravibhatt946@gmail.com';
 
+// Sending many emails sequentially (with retries + a PDF attachment) can take
+// a while; allow up to 60s so every member is reached before the function ends.
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -65,67 +69,74 @@ export async function POST(request: NextRequest) {
     const appUrl = resolveAppUrl(request);
 
     // Resolve each member's email (admin) and send the wrap-up email.
-    const results = await Promise.allSettled(
-      members.map(async (m) => {
-        if (!m.user_id) {
-          return { sent: false, name: m.display_name, reason: 'no-account' };
+    // Sent SEQUENTIALLY (not in parallel) because Gmail SMTP rate-limits
+    // concurrent connections — parallel sends cause some to silently drop.
+    const settled: { sent: boolean; name: string; email?: string; reason: string }[] = [];
+
+    for (const m of members) {
+      if (!m.user_id) {
+        settled.push({ sent: false, name: m.display_name, reason: 'no-account' });
+        continue;
+      }
+
+      let email: string | undefined;
+      try {
+        const { data, error } = await adminClient.auth.admin.getUserById(m.user_id);
+        if (error) {
+          console.error(`❌ getUserById failed for ${m.display_name}:`, error.message);
+          settled.push({ sent: false, name: m.display_name, reason: 'lookup-failed' });
+          continue;
         }
+        email = data?.user?.email || undefined;
+      } catch (e: any) {
+        console.error(`❌ getUserById threw for ${m.display_name}:`, e?.message);
+        settled.push({ sent: false, name: m.display_name, reason: 'lookup-error' });
+        continue;
+      }
 
-        let email: string | undefined;
-        try {
-          const { data, error } = await adminClient.auth.admin.getUserById(m.user_id);
-          if (error) {
-            console.error(`❌ getUserById failed for ${m.display_name}:`, error.message);
-            return { sent: false, name: m.display_name, reason: 'lookup-failed' };
-          }
-          email = data?.user?.email || undefined;
-        } catch (e: any) {
-          console.error(`❌ getUserById threw for ${m.display_name}:`, e?.message);
-          return { sent: false, name: m.display_name, reason: 'lookup-error' };
-        }
+      if (!email) {
+        settled.push({ sent: false, name: m.display_name, reason: 'no-email' });
+        continue;
+      }
 
-        if (!email) {
-          return { sent: false, name: m.display_name, reason: 'no-email' };
-        }
+      const sent = await sendTripEndedEmail({
+        to: email,
+        recipientName: m.display_name || 'there',
+        groupName: groupName || 'your group',
+        totalSpent: total,
+        memberCount,
+        perHeadShare,
+        reportFilename,
+        reportBuffer,
+        appUrl,
+      });
 
-        const sent = await sendTripEndedEmail({
-          to: email,
-          recipientName: m.display_name || 'there',
-          groupName: groupName || 'your group',
-          totalSpent: total,
-          memberCount,
-          perHeadShare,
-          reportFilename,
-          reportBuffer,
-          appUrl,
-        });
+      settled.push({ sent, name: m.display_name, email, reason: sent ? 'ok' : 'send-failed' });
+    }
 
-        return { sent, name: m.display_name, email, reason: sent ? 'ok' : 'send-failed' };
-      })
-    );
-
-    const settled = results.map((r) =>
-      r.status === 'fulfilled' ? r.value : { sent: false, name: 'unknown', reason: 'rejected' }
-    );
-    const sentCount = settled.filter((r) => (r as any).sent).length;
+    const sentCount = settled.filter((r) => r.sent).length;
 
     // Aggregate reasons so the UI/logs can explain the 0/N case.
     const reasons: Record<string, number> = {};
     settled.forEach((r) => {
-      const reason = (r as any).reason || 'unknown';
-      reasons[reason] = (reasons[reason] || 0) + 1;
+      reasons[r.reason] = (reasons[r.reason] || 0) + 1;
     });
     console.log('📊 End trip results:', { sentCount, memberCount, reasons });
+    // Log the names that didn't get an email so failures are traceable.
+    const failedNames = settled.filter((r) => !r.sent).map((r) => `${r.name}(${r.reason})`);
+    if (failedNames.length) console.warn('⚠️ Not emailed:', failedNames.join(', '));
 
     const withEmail = settled.filter(
-      (r) => (r as any).reason === 'ok' || (r as any).reason === 'send-failed'
+      (r) => r.reason === 'ok' || r.reason === 'send-failed'
     ).length;
 
     let message: string;
-    if (sentCount > 0) {
+    if (sentCount === memberCount) {
+      message = `Trip ended. Report emailed to all ${memberCount} members. 🎉`;
+    } else if (sentCount > 0) {
       message = `Trip ended. Report emailed to ${sentCount} of ${memberCount} members.`;
     } else if (withEmail === 0) {
-      message = `No emails sent: none of the ${memberCount} members have a registered account with an email address.`;
+      message = `No emails sent: none of the ${memberCount} members have a registered email address.`;
     } else {
       message = `Could not send emails (${withEmail} had addresses). Check SMTP configuration.`;
     }

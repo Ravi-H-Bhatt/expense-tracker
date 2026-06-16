@@ -196,13 +196,11 @@ export async function sendEmail(payload: EmailPayload): Promise<boolean> {
       // Always include a plain-text part for deliverability / Primary placement.
       text: payload.text || htmlToText(payload.html),
       attachments: payload.attachments,
+      // Keep headers minimal and transactional-looking. Bulk markers like
+      // List-Unsubscribe / Precedence:bulk push Gmail toward Promotions/Spam,
+      // so we deliberately avoid them for these personal, per-recipient emails.
       headers: {
-        // Mark as a personal/transactional message rather than bulk.
-        'X-Entity-Ref-ID': `rfin-${Date.now()}`,
-        'X-Priority': '3',
-        'X-Mailer': 'RFin Expense Tracker',
-        'List-Unsubscribe': `<mailto:${fromAddress}?subject=unsubscribe>`,
-        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        'X-Entity-Ref-ID': `rfin-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         ...(payload.headers || {}),
       },
     });
@@ -214,6 +212,23 @@ export async function sendEmail(payload: EmailPayload): Promise<boolean> {
     console.error('❌❌❌ Email sending failed:', error);
     return false;
   }
+}
+
+/**
+ * Send with retries. Gmail SMTP can transiently refuse/timeout, so we retry a
+ * couple of times with a short backoff to make delivery reliable for every
+ * recipient.
+ */
+export async function sendEmailWithRetry(payload: EmailPayload, attempts = 3): Promise<boolean> {
+  for (let i = 1; i <= attempts; i++) {
+    const ok = await sendEmail(payload);
+    if (ok) return true;
+    if (i < attempts) {
+      console.warn(`⚠️ Email to ${payload.to} failed (attempt ${i}/${attempts}), retrying...`);
+      await new Promise((r) => setTimeout(r, 800 * i));
+    }
+  }
+  return false;
 }
 
 /**
@@ -481,7 +496,7 @@ export async function sendTripEndedEmail(opts: {
     .filter(Boolean)
     .join('\n');
 
-  return sendEmail({
+  return sendEmailWithRetry({
     to,
     subject: `🧳 Trip wrap-up: ${groupName} (testing email — not a payment reminder)`,
     html,
