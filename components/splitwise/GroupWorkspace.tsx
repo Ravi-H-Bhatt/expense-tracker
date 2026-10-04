@@ -36,7 +36,7 @@ interface SharedState {
   balances: Record<string, { paid: number; owes: number; net: number; userId: string }>;
 }
 
-// Compute balances from expenses and splits - PROPERLY FIXED FOR REAL SPLITS
+// Compute balances from expenses and splits - FIXED TO MATCH DATABASE SPLITS EXACTLY
 function computeBalances(expenses: any[], splits: any[], members: any[]) {
   const balances: any = {};
   
@@ -50,80 +50,102 @@ function computeBalances(expenses: any[], splits: any[], members: any[]) {
     };
   });
 
-  // Step 1: Calculate what each person paid out of pocket
+  // Step 1: Calculate what each person paid out of pocket (INCLUDING group fund expenses)
   expenses.forEach(exp => {
-    // Group fund expenses don't count as individual payments
-    if (exp.is_group_fund_expense) return;
-    
     if (exp.paid_by_name && balances[exp.paid_by_name] !== undefined) {
       balances[exp.paid_by_name].paid += Number(exp.total_amount);
     }
   });
 
-  // Step 2: Calculate what each person owes based on ACTUAL SPLITS
-  // This is the key fix - use the actual split amounts, not equal division
+  // Step 2: Calculate what each person owes based on ACTUAL SPLITS from database
+  // Filter splits to only include those for expenses in our current expense list
   const expenseIds = expenses.map(e => e.id);
   const relevantSplits = splits.filter(s => expenseIds.includes(s.expense_id));
 
+  // Debug: Log the splits being processed
+  console.log('📊 Processing splits:', {
+    totalExpenses: expenses.length,
+    totalSplits: splits.length,
+    relevantSplits: relevantSplits.length,
+    expenseIds: expenseIds.slice(0, 5), // First 5 for debugging
+    sampleSplits: relevantSplits.slice(0, 10).map(s => ({
+      expense_id: s.expense_id,
+      display_name: s.display_name,
+      amount_owed: s.amount_owed
+    }))
+  });
+
+  // Sum up all splits for each person
   relevantSplits.forEach(split => {
-    // Sum ALL splits for each person (settled and unsettled)
-    // because we want to know the true debt, not just pending
     if (balances[split.display_name]) {
       balances[split.display_name].owes += Number(split.amount_owed);
+    } else {
+      console.warn('⚠️ Split found for unknown member:', split.display_name, 'Amount:', split.amount_owed);
     }
   });
 
-  // Step 3: Add group fund expenses - split equally among ALL members
-  const groupFundTotal = expenses
-    .filter(exp => exp.is_group_fund_expense)
-    .reduce((sum, exp) => sum + Number(exp.total_amount), 0);
-  
-  if (groupFundTotal > 0 && members.length > 0) {
-    const perPersonGroupFundShare = groupFundTotal / members.length;
-    Object.keys(balances).forEach(name => {
-      balances[name].owes += perPersonGroupFundShare;
-    });
-  }
-
-  // Step 4: Calculate net balance (who owes whom)
+  // Step 3: Calculate net balance (who owes whom)
   Object.keys(balances).forEach(name => {
     balances[name].net = balances[name].paid - balances[name].owes;
   });
 
-  // Step 5: VERIFICATION - Check that balances add up correctly
+  // Step 4: COMPREHENSIVE VERIFICATION
   const totalPaid = Object.values(balances).reduce((sum: number, b: any) => sum + b.paid, 0);
   const totalOwes = Object.values(balances).reduce((sum: number, b: any) => sum + b.owes, 0);
   const totalNet = Object.values(balances).reduce((sum: number, b: any) => sum + b.net, 0);
   const totalExpenses = expenses.reduce((sum, exp) => sum + Number(exp.total_amount), 0);
+  const totalSplitsSum = relevantSplits.reduce((sum, s) => sum + Number(s.amount_owed), 0);
 
-  console.log('🧮 CORRECTED Balance calculation:', {
-    totalExpenses,
-    totalPaid,
-    totalOwes,
-    totalNet: Math.round(totalNet * 100) / 100, // Round for display
-    groupFundTotal,
-    perPersonGroupFundShare: groupFundTotal / Math.max(members.length, 1),
+  console.log('🧮 FIXED Balance calculation:', {
+    totalExpenses: Math.round(totalExpenses * 100) / 100,
+    totalPaid: Math.round(totalPaid * 100) / 100,
+    totalOwes: Math.round(totalOwes * 100) / 100,
+    totalSplitsSum: Math.round(totalSplitsSum * 100) / 100,
+    totalNet: Math.round(totalNet * 100) / 100,
     membersCount: members.length,
     expensesCount: expenses.length,
     splitsCount: relevantSplits.length,
-    isBalanced: Math.abs(totalNet) < 1, // Should be ~0
-    balances: Object.entries(balances).map(([name, data]) => ({
+    isBalanced: Math.abs(totalNet) < 1,
+    paidEqualsExpenses: Math.abs(totalPaid - totalExpenses) < 1,
+    owesEqualsSplits: Math.abs(totalOwes - totalSplitsSum) < 1,
+    splitsEqualExpenses: Math.abs(totalSplitsSum - totalExpenses) < 1,
+    balanceDetails: Object.entries(balances).map(([name, data]) => ({
       name, 
-      paid: (data as any).paid,
-      owes: Math.round((data as any).owes),
-      net: Math.round((data as any).net)
+      paid: Math.round((data as any).paid * 100) / 100,
+      owes: Math.round((data as any).owes * 100) / 100,
+      net: Math.round((data as any).net * 100) / 100
     }))
   });
 
-  // Alert if balances don't add up (debugging)
+  // Alert on critical errors
   if (Math.abs(totalPaid - totalExpenses) > 1) {
-    console.error('❌ BALANCE ERROR: Total paid ≠ Total expenses', { totalPaid, totalExpenses });
+    console.error('❌ CRITICAL: Total paid ≠ Total expenses', { 
+      totalPaid: Math.round(totalPaid * 100) / 100, 
+      totalExpenses: Math.round(totalExpenses * 100) / 100,
+      difference: Math.round((totalPaid - totalExpenses) * 100) / 100
+    });
   }
-  if (Math.abs(totalOwes - totalExpenses) > 1) {
-    console.error('❌ BALANCE ERROR: Total owes ≠ Total expenses', { totalOwes, totalExpenses });
+  
+  if (Math.abs(totalOwes - totalSplitsSum) > 1) {
+    console.error('❌ CRITICAL: Total owes ≠ Total splits sum', { 
+      totalOwes: Math.round(totalOwes * 100) / 100, 
+      totalSplitsSum: Math.round(totalSplitsSum * 100) / 100,
+      difference: Math.round((totalOwes - totalSplitsSum) * 100) / 100
+    });
   }
+  
+  if (Math.abs(totalSplitsSum - totalExpenses) > 1) {
+    console.error('❌ CRITICAL: Splits sum ≠ Expenses total', { 
+      totalSplitsSum: Math.round(totalSplitsSum * 100) / 100, 
+      totalExpenses: Math.round(totalExpenses * 100) / 100,
+      difference: Math.round((totalSplitsSum - totalExpenses) * 100) / 100
+    });
+  }
+  
   if (Math.abs(totalNet) > 1) {
-    console.error('❌ BALANCE ERROR: Net balances don\'t sum to 0', { totalNet });
+    console.error('❌ CRITICAL: Net balances don\'t sum to 0', { 
+      totalNet: Math.round(totalNet * 100) / 100 
+    });
   }
 
   return balances;
