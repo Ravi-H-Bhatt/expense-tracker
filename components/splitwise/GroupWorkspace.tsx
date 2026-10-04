@@ -63,11 +63,24 @@ function computeBalances(expenses: any[], splits: any[], members: any[]) {
   const relevantSplits = splits.filter(s => expenseIds.includes(s.expense_id));
 
   // Debug: Log the splits being processed
-  console.log('📊 Processing splits:', {
+  console.log('📊 UJJAIN TRIP - Processing splits:', {
     totalExpenses: expenses.length,
     totalSplits: splits.length,
     relevantSplits: relevantSplits.length,
     expenseIds: expenseIds.slice(0, 5), // First 5 for debugging
+    sampleSplits: relevantSplits.slice(0, 10).map(s => ({
+      expense_id: s.expense_id,
+      display_name: s.display_name,
+      amount_owed: s.amount_owed
+    })),
+    // Show Train splits specifically
+    trainSplits: relevantSplits.filter(s => 
+      expenses.find(e => e.id === s.expense_id)?.description?.toLowerCase().includes('train')
+    ).map(s => ({
+      display_name: s.display_name,
+      amount_owed: s.amount_owed
+    }))
+  });
     sampleSplits: relevantSplits.slice(0, 10).map(s => ({
       expense_id: s.expense_id,
       display_name: s.display_name,
