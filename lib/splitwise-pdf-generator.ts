@@ -58,6 +58,9 @@ export class SplitwisePDFGenerator {
   }
 
   private drawHeader(title: string, subtitle: string) {
+    // Clean subtitle text - remove any encoding issues
+    const cleanSubtitle = subtitle.replace(/[^\x20-\x7E]/g, '').trim() || 'Group';
+    
     // Base band
     this.doc.setFillColor(...COLORS.primary);
     this.doc.rect(0, 0, this.pageWidth, 52, 'F');
@@ -83,7 +86,7 @@ export class SplitwisePDFGenerator {
 
     this.doc.setFontSize(13);
     this.doc.setFont('helvetica', 'normal');
-    this.doc.text(subtitle, this.margin, 42);
+    this.doc.text(cleanSubtitle, this.margin, 42);
 
     this.currentY = 64;
   }
@@ -272,33 +275,56 @@ export class SplitwisePDFGenerator {
   // Compute a minimal "who pays whom" settlement plan from member net balances.
   // Greedy match: largest debtor pays largest creditor until everyone nets to ~0.
   private computeSettlementPlan(members: MemberExpense[]): { from: string; to: string; amount: number }[] {
+    // Copy members and sort by net balance
     const creditors = members
-      .filter(m => m.net > 0.5)
+      .filter(m => m.net > 0.01)  // Small tolerance for rounding
       .map(m => ({ name: m.name, amt: m.net }))
-      .sort((a, b) => b.amt - a.amt);
+      .sort((a, b) => b.amt - a.amt);  // Largest creditor first
+    
     const debtors = members
-      .filter(m => m.net < -0.5)
-      .map(m => ({ name: m.name, amt: -m.net }))
-      .sort((a, b) => b.amt - a.amt);
+      .filter(m => m.net < -0.01)  // Small tolerance for rounding
+      .map(m => ({ name: m.name, amt: -m.net }))  // Make positive
+      .sort((a, b) => b.amt - a.amt);  // Largest debtor first
 
     const plan: { from: string; to: string; amount: number }[] = [];
-    let i = 0;
-    let j = 0;
-    // Guard against infinite loops with a hard cap.
-    let guard = 0;
-    const maxIterations = (creditors.length + debtors.length) * 2 + 5;
-
-    while (i < debtors.length && j < creditors.length && guard < maxIterations) {
-      guard += 1;
-      const pay = Math.min(debtors[i].amt, creditors[j].amt);
-      if (pay > 0.5) {
-        plan.push({ from: debtors[i].name, to: creditors[j].name, amount: Math.round(pay) });
+    
+    // Greedy settlement: match largest debtor with largest creditor
+    while (creditors.length > 0 && debtors.length > 0) {
+      const creditor = creditors[0];
+      const debtor = debtors[0];
+      
+      // Amount to settle is minimum of what creditor is owed and what debtor owes
+      const settleAmount = Math.min(creditor.amt, debtor.amt);
+      
+      if (settleAmount > 0.01) {
+        plan.push({
+          from: debtor.name,
+          to: creditor.name,
+          amount: Math.round(settleAmount)
+        });
       }
-      debtors[i].amt -= pay;
-      creditors[j].amt -= pay;
-      if (debtors[i].amt <= 0.5) i += 1;
-      if (creditors[j].amt <= 0.5) j += 1;
+      
+      // Reduce amounts
+      creditor.amt -= settleAmount;
+      debtor.amt -= settleAmount;
+      
+      // Remove if settled
+      if (creditor.amt <= 0.01) creditors.shift();
+      if (debtor.amt <= 0.01) debtors.shift();
     }
+
+    // Verify settlement plan balances (debug)
+    const totalCredits = plan.reduce((sum, p) => sum + p.amount, 0);
+    const netCreditors = members.filter(m => m.net > 0.01).reduce((sum, m) => sum + m.net, 0);
+    const netDebtors = members.filter(m => m.net < -0.01).reduce((sum, m) => sum + Math.abs(m.net), 0);
+    
+    console.log('🏦 Settlement plan verification:', {
+      planTotal: totalCredits,
+      netCreditorAmount: Math.round(netCreditors),
+      netDebtorAmount: Math.round(netDebtors),
+      planCount: plan.length,
+      isBalanced: Math.abs(totalCredits - netCreditors) < 1
+    });
 
     return plan;
   }
@@ -419,7 +445,7 @@ export class SplitwisePDFGenerator {
     }
   }
 
-  // Generate Monthly Group Report
+  // Generate Monthly Group Report (now actually Full Trip Report)
   generateMonthlyGroupReport(data: {
     groupName: string;
     month: string;
@@ -431,13 +457,22 @@ export class SplitwisePDFGenerator {
     groupFundSpent?: number;      // total spent FROM the pooled fund in this period
     categoryBreakdown: { category: string; amount: number }[];
   }) {
+    // Calculate actual date range from expenses
+    const dates = data.expenses.map(e => new Date(e.created_at)).sort();
+    const startDate = dates.length > 0 ? dates[0] : new Date();
+    const endDate = dates.length > 0 ? dates[dates.length - 1] : new Date();
+    
+    const dateRange = dates.length > 0 
+      ? `${startDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} - ${endDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
+      : data.month;
+
     this.drawHeader('Group Expense Report', `${data.groupName}`);
 
-    // Period info
+    // Show actual trip period, not just month
     this.doc.setFontSize(12);
     this.doc.setFont('helvetica', 'bold');
     this.doc.setTextColor(...COLORS.primary);
-    this.doc.text(`Period: ${data.month} ${data.year}`, this.margin, this.currentY);
+    this.doc.text(`Period: ${dateRange}`, this.margin, this.currentY);
     this.currentY += 7;
     
     this.doc.setFontSize(9);
@@ -498,27 +533,33 @@ export class SplitwisePDFGenerator {
       this.checkPageBreak(40);
       this.drawSectionHeader('Balance Sheet', '💰');
 
-      // Each member's equal share of the pooled group fund (collected + spent).
+      // Calculate total group fund properly
       const fundSpentTotal =
         typeof data.groupFundSpent === 'number'
           ? data.groupFundSpent
           : data.expenses
               .filter((e: any) => e.is_group_fund_expense)
               .reduce((sum: number, e: any) => sum + Number(e.total_amount), 0);
+
+      // Group fund remaining + spent = total pool
       const fundPool = (data.groupFund || 0) + fundSpentTotal;
       const perHeadFund = data.members.length > 0 ? fundPool / data.members.length : 0;
 
+      // CORRECTED: Show actual split-based balances, not equal division
       const balanceData = data.members.map(m => {
-        const status = m.net === 0 ? 'Settled' : m.net > 0 ? 'Gets Back' : 'Owes';
-        // Total spent by this person = their group-fund share + what they paid out of pocket.
+        const status = Math.abs(m.net) < 1 ? 'Settled' : m.net > 0 ? 'Gets Back' : 'Owes';
+        
+        // Total spent = group fund share + personal payments
+        // Total owes = their actual share of expenses (from splits)
         const totalSpent = perHeadFund + m.paid;
+        
         return [
           m.name,
-          this.formatCurrency(perHeadFund),
-          this.formatCurrency(m.paid),
-          this.formatCurrency(totalSpent),
-          this.formatCurrency(m.owes),
-          this.formatCurrency(Math.abs(m.net)),
+          this.formatCurrency(perHeadFund),           // Group fund share
+          this.formatCurrency(m.paid),                // Paid out of pocket
+          this.formatCurrency(totalSpent),           // Total spent (fund + personal)
+          this.formatCurrency(m.owes),               // ACTUAL owes (from splits, not equal)
+          this.formatCurrency(Math.abs(m.net)),      // Net balance
           status
         ];
       });
@@ -540,6 +581,17 @@ export class SplitwisePDFGenerator {
 
       // Settlement plan — who pays whom to clear all debts
       this.drawSettlementPlan(data.members);
+
+      // Verification happens in console only, not in PDF
+      const totalPaid = data.members.reduce((sum, m) => sum + m.paid, 0);
+      const totalOwes = data.members.reduce((sum, m) => sum + m.owes, 0);
+      const totalNet = data.members.reduce((sum, m) => sum + m.net, 0);
+      
+      if (Math.abs(totalNet) > 1) {
+        console.warn('⚠️ PDF Balance verification failed:', { totalPaid, totalOwes, totalNet });
+      } else {
+        console.log('✅ PDF Balance verification passed:', { totalPaid, totalOwes, totalNet: Math.round(totalNet * 100) / 100 });
+      }
     }
 
     // Category breakdown

@@ -398,21 +398,6 @@ export async function sendTripEndedEmail(opts: {
     appUrl = DEFAULT_APP_URL,
   } = opts;
 
-  // Bold testing banner — required.
-  const testingBanner = `
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;">
-      <tr>
-        <td style="background:#FEF3C7;border:2px solid #F59E0B;border-radius:14px;padding:16px 18px;">
-          <p style="margin:0;color:#92400E;font-size:15px;font-weight:800;line-height:1.5;">
-            ⚠️ IMPORTANT: This is a TESTING email — NOT a payment reminder.
-          </p>
-          <p style="margin:6px 0 0;color:#B45309;font-size:13px;font-weight:600;line-height:1.5;">
-            No money is due from this message. It's just a wrap-up of the trip with your report attached.
-          </p>
-        </td>
-      </tr>
-    </table>`;
-
   const statsRow = `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0;">
       <tr>
@@ -443,7 +428,6 @@ export async function sendTripEndedEmail(opts: {
       : '';
 
   const body = `
-    ${testingBanner}
     <p style="margin:0 0 16px;">Hi <strong>${esc(recipientName)}</strong>,</p>
     <p style="margin:0 0 4px;">
       That's a wrap on <strong>"${esc(groupName)}"</strong>! 🎉 Here's the final summary of everything
@@ -468,7 +452,7 @@ export async function sendTripEndedEmail(opts: {
     </table>`;
 
   const html = renderEmail({
-    preheader: `Trip wrap-up for ${groupName} — your report is attached (testing email, not a payment reminder)`,
+    preheader: `Trip wrap-up for ${groupName} — your report is attached`,
     accent: '#10B981',
     accentDark: '#047857',
     icon: '🧳',
@@ -479,8 +463,6 @@ export async function sendTripEndedEmail(opts: {
   });
 
   const text = [
-    'IMPORTANT: This is a TESTING email — NOT a payment reminder. No money is due.',
-    '',
     `Hi ${recipientName},`,
     '',
     `That's a wrap on "${groupName}"!`,
@@ -498,7 +480,7 @@ export async function sendTripEndedEmail(opts: {
 
   return sendEmailWithRetry({
     to,
-    subject: `🧳 Trip wrap-up: ${groupName} (testing email — not a payment reminder)`,
+    subject: `🧳 Trip wrap-up: ${groupName}`,
     html,
     text,
     fromName: 'RFin Trips',

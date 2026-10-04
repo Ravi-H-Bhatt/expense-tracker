@@ -36,37 +36,95 @@ interface SharedState {
   balances: Record<string, { paid: number; owes: number; net: number; userId: string }>;
 }
 
-// Compute balances from expenses and splits
+// Compute balances from expenses and splits - PROPERLY FIXED FOR REAL SPLITS
 function computeBalances(expenses: any[], splits: any[], members: any[]) {
   const balances: any = {};
+  
+  // Initialize each member
   members.forEach(m => {
     balances[m.display_name] = { 
-      paid: 0, 
-      owes: 0, 
-      net: 0,
+      paid: 0,           // What this person paid out of pocket
+      owes: 0,           // What this person owes (sum of their splits)
+      net: 0,            // Final balance: paid - owes
       userId: m.user_id 
     };
   });
 
+  // Step 1: Calculate what each person paid out of pocket
   expenses.forEach(exp => {
+    // Group fund expenses don't count as individual payments
     if (exp.is_group_fund_expense) return;
+    
     if (exp.paid_by_name && balances[exp.paid_by_name] !== undefined) {
       balances[exp.paid_by_name].paid += Number(exp.total_amount);
     }
   });
 
+  // Step 2: Calculate what each person owes based on ACTUAL SPLITS
+  // This is the key fix - use the actual split amounts, not equal division
   const expenseIds = expenses.map(e => e.id);
   const relevantSplits = splits.filter(s => expenseIds.includes(s.expense_id));
 
   relevantSplits.forEach(split => {
-    if (!split.is_settled && balances[split.display_name]) {
+    // Sum ALL splits for each person (settled and unsettled)
+    // because we want to know the true debt, not just pending
+    if (balances[split.display_name]) {
       balances[split.display_name].owes += Number(split.amount_owed);
     }
   });
 
+  // Step 3: Add group fund expenses - split equally among ALL members
+  const groupFundTotal = expenses
+    .filter(exp => exp.is_group_fund_expense)
+    .reduce((sum, exp) => sum + Number(exp.total_amount), 0);
+  
+  if (groupFundTotal > 0 && members.length > 0) {
+    const perPersonGroupFundShare = groupFundTotal / members.length;
+    Object.keys(balances).forEach(name => {
+      balances[name].owes += perPersonGroupFundShare;
+    });
+  }
+
+  // Step 4: Calculate net balance (who owes whom)
   Object.keys(balances).forEach(name => {
     balances[name].net = balances[name].paid - balances[name].owes;
   });
+
+  // Step 5: VERIFICATION - Check that balances add up correctly
+  const totalPaid = Object.values(balances).reduce((sum: number, b: any) => sum + b.paid, 0);
+  const totalOwes = Object.values(balances).reduce((sum: number, b: any) => sum + b.owes, 0);
+  const totalNet = Object.values(balances).reduce((sum: number, b: any) => sum + b.net, 0);
+  const totalExpenses = expenses.reduce((sum, exp) => sum + Number(exp.total_amount), 0);
+
+  console.log('🧮 CORRECTED Balance calculation:', {
+    totalExpenses,
+    totalPaid,
+    totalOwes,
+    totalNet: Math.round(totalNet * 100) / 100, // Round for display
+    groupFundTotal,
+    perPersonGroupFundShare: groupFundTotal / Math.max(members.length, 1),
+    membersCount: members.length,
+    expensesCount: expenses.length,
+    splitsCount: relevantSplits.length,
+    isBalanced: Math.abs(totalNet) < 1, // Should be ~0
+    balances: Object.entries(balances).map(([name, data]) => ({
+      name, 
+      paid: (data as any).paid,
+      owes: Math.round((data as any).owes),
+      net: Math.round((data as any).net)
+    }))
+  });
+
+  // Alert if balances don't add up (debugging)
+  if (Math.abs(totalPaid - totalExpenses) > 1) {
+    console.error('❌ BALANCE ERROR: Total paid ≠ Total expenses', { totalPaid, totalExpenses });
+  }
+  if (Math.abs(totalOwes - totalExpenses) > 1) {
+    console.error('❌ BALANCE ERROR: Total owes ≠ Total expenses', { totalOwes, totalExpenses });
+  }
+  if (Math.abs(totalNet) > 1) {
+    console.error('❌ BALANCE ERROR: Net balances don\'t sum to 0', { totalNet });
+  }
 
   return balances;
 }

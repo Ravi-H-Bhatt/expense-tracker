@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import { Trash2, Download, Calendar } from 'lucide-react';
+import { Trash2, Download } from 'lucide-react';
 import { SplitwisePDFGenerator } from '@/lib/splitwise-pdf-generator';
 import { resolveDisplayName } from '@/lib/display-name';
 import { buildCategoryBreakdown, categorizeExpense } from '@/lib/expense-category';
@@ -36,11 +36,7 @@ export default function GroupSummary({
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isSettling, setIsSettling] = useState(false);
   const [processingNotif, setProcessingNotif] = useState<string | null>(null);
-  const [showExportMenu, setShowExportMenu] = useState(false);
   const [isRemindingAll, setIsRemindingAll] = useState(false);
-  const [reportType, setReportType] = useState<'monthly' | 'yearly'>('monthly');
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [isEndingTrip, setIsEndingTrip] = useState(false);
 
   // Owner-only feature gate for "End Trip".
@@ -426,6 +422,7 @@ export default function GroupSummary({
     // Category breakdown across the whole trip.
     const categoryBreakdown = buildCategoryBreakdown(expenses);
 
+    // Use the correctly calculated balances from state
     const memberBalances = Object.entries(balances).map(([name, data]: [string, any]) => ({
       name,
       paid: data.paid,
@@ -433,6 +430,7 @@ export default function GroupSummary({
       net: data.net,
     }));
 
+    // Generate the full trip report
     pdfGen.generateMonthlyGroupReport({
       groupName: group.name,
       month: 'Full Trip',
@@ -446,6 +444,16 @@ export default function GroupSummary({
     });
 
     const filename = `${group.name.replace(/[^a-z0-9]/gi, '_')}_Trip_Report.pdf`;
+    
+    // Debug: Log the balances being used in PDF
+    console.log('📄 PDF generation with balances:', {
+      totalSpent,
+      groupFundSpent,
+      memberCount: memberBalances.length,
+      balances: memberBalances,
+      netSum: memberBalances.reduce((sum, m) => sum + m.net, 0)
+    });
+    
     return {
       base64: pdfGen.outputBase64(),
       filename,
@@ -504,128 +512,61 @@ export default function GroupSummary({
     }
   };
 
-  const handleExportReport = () => {
+  const handleExportTripReport = () => {
     try {
-      const pdfGen = new SplitwisePDFGenerator();
-      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                         'July', 'August', 'September', 'October', 'November', 'December'];
-
-      if (reportType === 'monthly') {
-        // Filter expenses by selected month and year
-        const filteredExpenses = expenses.filter(exp => {
-          const expDate = new Date(exp.created_at);
-          return expDate.getMonth() === selectedMonth && expDate.getFullYear() === selectedYear;
-        });
-
-        if (filteredExpenses.length === 0) {
-          toast.error('No expenses found for selected month');
-          return;
-        }
-
-        const totalSpent = filteredExpenses.reduce((sum, e) => sum + Number(e.total_amount), 0);
-
-        // Calculate category breakdown
-        const categoryBreakdown = buildCategoryBreakdown(filteredExpenses);
-
-        const memberBalances = Object.entries(balances).map(([name, data]: [string, any]) => ({
-          name,
-          paid: data.paid,
-          owes: data.owes,
-          net: data.net
-        }));
-
-        pdfGen.generateMonthlyGroupReport({
-          groupName: group.name,
-          month: monthNames[selectedMonth],
-          year: selectedYear.toString(),
-          expenses: filteredExpenses,
-          members: memberBalances,
-          totalSpent,
-          groupFund: group.group_fund || 0,
-          groupFundSpent: filteredExpenses
-            .filter((e: any) => e.is_group_fund_expense)
-            .reduce((sum: number, e: any) => sum + Number(e.total_amount), 0),
-          categoryBreakdown
-        });
-
-        pdfGen.save(`${group.name.replace(/[^a-z0-9]/gi, '_')}_${monthNames[selectedMonth]}_${selectedYear}.pdf`);
-      } else {
-        // Yearly report
-        const monthlyData = monthNames.map((month, index) => {
-          const monthExpenses = expenses.filter(exp => {
-            const expDate = new Date(exp.created_at);
-            return expDate.getMonth() === index && expDate.getFullYear() === selectedYear;
-          });
-
-          return {
-            month,
-            totalExpenses: monthExpenses.length,
-            totalAmount: monthExpenses.reduce((sum, e) => sum + Number(e.total_amount), 0),
-            memberCount: members.length
-          };
-        });
-
-        const yearExpenses = expenses.filter(exp => {
-          const expDate = new Date(exp.created_at);
-          return expDate.getFullYear() === selectedYear;
-        });
-
-        if (yearExpenses.length === 0) {
-          toast.error('No expenses found for selected year');
-          return;
-        }
-
-        const totalAmount = yearExpenses.reduce((sum, e) => sum + Number(e.total_amount), 0);
-
-        // Category breakdown for year
-        const categoryBreakdown = buildCategoryBreakdown(yearExpenses);
-
-        const memberBalances = Object.entries(balances).map(([name, data]: [string, any]) => ({
-          name,
-          paid: data.paid,
-          owes: data.owes,
-          net: data.net
-        }));
-
-        pdfGen.generateYearlyGroupReport({
-          groupName: group.name,
-          year: selectedYear.toString(),
-          monthlyData,
-          members: memberBalances,
-          totalExpenses: yearExpenses.length,
-          totalAmount,
-          categoryBreakdown
-        });
-
-        pdfGen.save(`${group.name.replace(/[^a-z0-9]/gi, '_')}_Annual_${selectedYear}.pdf`);
+      if (expenses.length === 0) {
+        toast.error('No expenses yet — nothing to report.');
+        return;
       }
 
-      toast.success('Report downloaded successfully!');
-      setShowExportMenu(false);
+      const pdfGen = new SplitwisePDFGenerator();
+      const totalSpent = expenses.reduce((sum, e) => sum + Number(e.total_amount), 0);
+      const groupFundSpent = expenses
+        .filter((e: any) => e.is_group_fund_expense)
+        .reduce((sum: number, e: any) => sum + Number(e.total_amount), 0);
+
+      // Category breakdown across the whole trip
+      const categoryBreakdown = buildCategoryBreakdown(expenses);
+
+      const memberBalances = Object.entries(balances).map(([name, data]: [string, any]) => ({
+        name,
+        paid: data.paid,
+        owes: data.owes,
+        net: data.net,
+      }));
+
+      // Generate full trip report (not monthly/yearly)
+      pdfGen.generateMonthlyGroupReport({
+        groupName: group.name,
+        month: 'Full Trip',
+        year: new Date().getFullYear().toString(),
+        expenses,
+        members: memberBalances,
+        totalSpent,
+        groupFund: group.group_fund || 0,
+        groupFundSpent,
+        categoryBreakdown,
+      });
+
+      const filename = `${group.name.replace(/[^a-z0-9]/gi, '_')}_Trip_Report.pdf`;
+      pdfGen.save(filename);
+
+      toast.success('Trip report downloaded successfully!');
     } catch (error) {
-      console.error('Error generating report:', error);
+      console.error('Error generating trip report:', error);
       toast.error('Failed to generate report');
     }
   };
 
-  // Generate month and year options
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
-
   return (
     <div className="h-full overflow-y-auto p-3 lg:p-6 space-y-4 lg:space-y-6 stagger">
-      {/* Export Report Section */}
+      {/* Export Trip Report Section */}
       <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 lg:p-6 hover-lift">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Download className="w-5 h-5 text-[#047857]" />
             <h3 className="font-['var(--font-playfair)'] font-semibold text-[#0F172A] text-lg lg:text-xl">
-              Export Monthly Report
+              Export Full Trip Report
             </h3>
           </div>
           <div className="flex items-center gap-2">
@@ -640,108 +581,18 @@ export default function GroupSummary({
               </button>
             )}
             <button
-              onClick={() => setShowExportMenu(!showExportMenu)}
+              onClick={handleExportTripReport}
               className="press px-4 py-2 bg-[#047857] text-white rounded-lg hover:bg-[#065F46] transition-colors text-sm font-['var(--font-dm-sans)'] font-medium flex items-center gap-2"
             >
-              <Calendar className="w-4 h-4" />
-              Export PDF
+              <Download className="w-4 h-4" />
+              Export Trip PDF
             </button>
           </div>
         </div>
 
-        {showExportMenu && (
-          <div className="bg-[#F1F5F9] rounded-xl p-4 space-y-4 animate-fade-in-up">
-            <div>
-              <label className="block text-sm font-['var(--font-dm-sans)'] font-medium text-[#475569] mb-2">
-                Report Type
-              </label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setReportType('monthly')}
-                  className={`flex-1 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
-                    reportType === 'monthly'
-                      ? 'bg-[#047857] text-white'
-                      : 'bg-white text-[#047857] border border-[#10B981]'
-                  }`}
-                >
-                  📅 Monthly Report
-                </button>
-                <button
-                  onClick={() => setReportType('yearly')}
-                  className={`flex-1 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
-                    reportType === 'yearly'
-                      ? 'bg-[#047857] text-white'
-                      : 'bg-white text-[#047857] border border-[#10B981]'
-                  }`}
-                >
-                  📊 Yearly Report
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {reportType === 'monthly' && (
-                <div>
-                  <label className="block text-sm font-['var(--font-dm-sans)'] font-medium text-[#475569] mb-2">
-                    Select Month
-                  </label>
-                  <select
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-[#10B981] rounded-lg text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#047857] font-['var(--font-dm-sans)']"
-                  >
-                    {months.map((month, index) => (
-                      <option key={index} value={index}>
-                        {month}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div className={reportType === 'yearly' ? 'col-span-2' : ''}>
-                <label className="block text-sm font-['var(--font-dm-sans)'] font-medium text-[#475569] mb-2">
-                  Select Year
-                </label>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-[#10B981] rounded-lg text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#047857] font-['var(--font-dm-sans)']"
-                >
-                  {years.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-              {reportType === 'monthly' ? (
-                <p>📄 Monthly report includes: member balances, category breakdown, and detailed expense list for {months[selectedMonth]} {selectedYear}</p>
-              ) : (
-                <p>📊 Yearly report includes: 12-month trend analysis, annual member contributions, category breakdown, and monthly summaries for {selectedYear}</p>
-              )}
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={handleExportReport}
-                className="flex-1 px-4 py-2 bg-[#047857] text-white rounded-lg hover:bg-[#065F46] transition-colors text-sm font-['var(--font-dm-sans)'] font-medium flex items-center justify-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Generate {reportType === 'monthly' ? 'Monthly' : 'Yearly'} Report
-              </button>
-              <button
-                onClick={() => setShowExportMenu(false)}
-                className="px-4 py-2 border border-[#10B981] text-[#047857] rounded-lg hover:bg-[#F1F5F9] transition-colors text-sm font-['var(--font-dm-sans)'] font-medium"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+          <p>📄 Complete trip report includes: all expenses, balanced settlements, category breakdown, and member contributions for the entire trip</p>
+        </div>
       </div>
 
       {/* Payment Request Notifications */}
@@ -1195,16 +1046,17 @@ export default function GroupSummary({
         </div>
       )}
 
-      {/* Recent Expenses List with Delete Button */}
+      {/* Recent Expenses List with Delete Button - Now Scrollable */}
       <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 lg:p-6 hover-lift">
         <h3 className="font-['var(--font-playfair)'] font-semibold text-[#0F172A] text-lg lg:text-xl mb-3 lg:mb-4">
-          Recent Expenses
+          All Expenses ({expenses.length})
         </h3>
         
-        <div className="space-y-2 lg:space-y-3">
-          {expenses.slice(0, 10).map((expense) => (
-            <div key={expense.id} className="flex items-center gap-2 lg:gap-3 py-2 lg:py-3 border-b border-[#E2E8F0] last:border-0">
-              <div className="text-xl lg:text-2xl">
+        {/* Make this scrollable */}
+        <div className="max-h-96 overflow-y-auto space-y-2 lg:space-y-3 scrollbar-thin scrollbar-thumb-[#047857] scrollbar-track-[#F1F5F9]">
+          {expenses.map((expense) => (
+            <div key={expense.id} className="flex items-center gap-2 lg:gap-3 py-2 lg:py-3 border-b border-[#E2E8F0] last:border-0 bg-white hover:bg-[#F8FAFC] transition-colors rounded-lg px-2">
+              <div className="text-xl lg:text-2xl flex-shrink-0">
                 {expense.is_group_fund_expense ? '📦' : '💸'}
               </div>
               <div className="flex-1 min-w-0">
@@ -1222,7 +1074,8 @@ export default function GroupSummary({
                   {' · '}
                   {new Date(expense.created_at).toLocaleDateString('en-IN', { 
                     month: 'short', 
-                    day: 'numeric' 
+                    day: 'numeric',
+                    year: 'numeric'
                   })}
                 </p>
               </div>
@@ -1232,8 +1085,9 @@ export default function GroupSummary({
               {onDeleteExpense && (
                 <button
                   onClick={() => {
-                    if (confirm('Delete this expense? This will recalculate all balances.')) {
+                    if (confirm(`Delete "${expense.description}"?\n\nThis will recalculate all balances and settlements.`)) {
                       onDeleteExpense(expense.id);
+                      toast.success('Expense deleted and balances updated');
                     }
                   }}
                   className="p-1.5 lg:p-2 hover:bg-red-50 rounded-lg transition-colors group flex-shrink-0"
@@ -1244,6 +1098,16 @@ export default function GroupSummary({
               )}
             </div>
           ))}
+          
+          {expenses.length === 0 && (
+            <div className="text-center py-8 text-[#475569]">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-[#F1F5F9] flex items-center justify-center">
+                <span className="text-2xl">📝</span>
+              </div>
+              <p className="font-['var(--font-dm-sans)']">No expenses yet</p>
+              <p className="text-xs mt-1">Add expenses using the chat above</p>
+            </div>
+          )}
         </div>
 
         {expenses.length === 0 && (
