@@ -75,13 +75,17 @@ export async function logActivity(params: LogActivityParams): Promise<void> {
   
   // Get user if not provided
   let actorUserId = params.actor_user_id
-  if (!actorUserId) {
-    const { data: { user } } = await supabase.auth.getUser()
-    actorUserId = user?.id
+  let actorEmail: string | undefined
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    actorUserId = actorUserId || user.id
+    actorEmail = user.email
   }
 
   const logData = {
     actor_user_id: actorUserId,
+    actor_email: actorEmail,
     action_type: params.action_type,
     entity_type: params.entity_type,
     entity_id: params.entity_id,
@@ -118,13 +122,7 @@ export async function getActivityLogs(options?: {
 
   let query = supabase
     .from('activity_logs')
-    .select(`
-      *,
-      actor:auth.users!activity_logs_actor_user_id_fkey(
-        email,
-        raw_user_meta_data
-      )
-    `, { count: 'exact' })
+    .select('*', { count: 'exact' })
 
   // Apply filters
   if (options?.actor_user_id) {
@@ -161,7 +159,7 @@ export async function getActivityLogs(options?: {
   if (error) throw error
 
   return {
-    logs: data || [],
+    logs: (data || []) as ActivityLog[],
     total: count || 0
   }
 }
@@ -175,30 +173,12 @@ export async function getRecentActivity(limit = 10): Promise<ActivityLog[]> {
 
   const { data } = await supabase
     .from('activity_logs')
-    .select(`
-      *,
-      actor:auth.users!activity_logs_actor_user_id_fkey(
-        email,
-        raw_user_meta_data
-      )
-    `)
-    .or(`actor_user_id.eq.${user.id},group_id.in.(${await getUserGroupIds(user.id)})`)
+    .select('*')
+    .eq('actor_user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(limit)
 
-  return data || []
-}
-
-// Helper to get user's group IDs
-async function getUserGroupIds(userId: string): Promise<string> {
-  const supabase = await createClient()
-  
-  const { data } = await supabase
-    .from('group_members')
-    .select('group_id')
-    .eq('user_id', userId)
-
-  return (data || []).map(g => g.group_id).join(',')
+  return (data || []) as ActivityLog[]
 }
 
 // Format action type for display

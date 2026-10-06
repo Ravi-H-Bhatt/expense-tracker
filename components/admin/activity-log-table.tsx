@@ -60,7 +60,7 @@ export async function ActivityLogTable({ searchParams }: ActivityLogTableProps) 
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div>
                         <div className="font-medium text-slate-900">
-                          {(log as any).actor?.email || 'System'}
+                          {log.actor_email || 'System'}
                         </div>
                         {log.ip_address && (
                           <div className="text-slate-500 text-xs">
