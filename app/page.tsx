@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { ArrowRight, Sparkles, Shield, TrendingUp, Bot, Wallet, PieChart, Users } from 'lucide-react';
+import { ArrowRight, Shield, TrendingUp, Bot, Wallet, PieChart, Users } from 'lucide-react';
+import { RFinLogo } from '@/components/ui/rfin-logo';
 
 export default function HomePage() {
   return (
@@ -12,15 +13,10 @@ export default function HomePage() {
       <div className="relative z-10 container mx-auto px-4 py-10 lg:py-16">
         {/* Header */}
         <header className="flex justify-between items-center mb-16 lg:mb-24 animate-fade-in">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold tracking-tight">RFin</span>
-          </div>
+          <RFinLogo className="text-white" size="md" />
           <Link
             href="/auth/login"
-            className="press px-5 py-2.5 rounded-xl border border-white/20 bg-white/5 backdrop-blur-sm text-sm font-medium hover:bg-white/10 transition-colors"
+            className="px-5 py-2.5 rounded-lg border border-white/20 bg-white/5 backdrop-blur-sm text-sm font-medium hover:bg-white/10 transition-colors"
           >
             Sign In
           </Link>
@@ -37,7 +33,7 @@ export default function HomePage() {
             <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-[1.1] tracking-tight">
               Master your money,
               <br />
-              <span className="text-money">split it smarter.</span>
+              <span className="text-emerald-300">split it smarter.</span>
             </h1>
 
             <p className="text-lg text-white/70 mb-9 max-w-xl leading-relaxed">
@@ -47,15 +43,15 @@ export default function HomePage() {
 
             <div className="flex gap-4 flex-wrap">
               <Link
-                href="/signup"
-                className="press sheen inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-600 text-white font-semibold shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-shadow"
+                href="/auth/signup"
+                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-lg bg-gradient-to-r from-emerald-400 to-emerald-600 text-white font-semibold shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-shadow"
               >
                 Get Started Free
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <Link
                 href="/auth/login"
-                className="press inline-flex items-center px-7 py-3.5 rounded-xl border border-white/20 bg-white/5 backdrop-blur-sm font-semibold hover:bg-white/10 transition-colors"
+                className="inline-flex items-center px-7 py-3.5 rounded-lg border border-white/20 bg-white/5 backdrop-blur-sm font-semibold hover:bg-white/10 transition-colors"
               >
                 Sign In
               </Link>
@@ -64,15 +60,15 @@ export default function HomePage() {
             {/* Trust stats */}
             <div className="flex gap-8 mt-12">
               <div>
-                <p className="text-2xl font-bold text-money">256-bit</p>
+                <p className="text-2xl font-bold text-emerald-300">256-bit</p>
                 <p className="text-sm text-white/50">Encrypted & secure</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-money">₹0</p>
+                <p className="text-2xl font-bold text-emerald-300">₹0</p>
                 <p className="text-sm text-white/50">Free to start</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-money">AI</p>
+                <p className="text-2xl font-bold text-emerald-300">AI</p>
                 <p className="text-sm text-white/50">Smart splitting</p>
               </div>
             </div>
@@ -81,10 +77,10 @@ export default function HomePage() {
           {/* Floating dashboard preview card */}
           <div className="relative animate-scale-in hidden lg:block">
             <div className="float p-6 bg-white/10 backdrop-blur-xl rounded-3xl border border-white/15 shadow-2xl">
-              <div className="flex items-center justify-between mb-6">
+              <div className="mb-6">
                 <div>
                   <p className="text-sm text-white/50">Total Balance</p>
-                  <p className="text-3xl font-bold text-money">₹48,250</p>
+                  <p className="text-3xl font-bold text-emerald-300">₹48,250</p>
                 </div>
                 <div className="w-11 h-11 rounded-2xl bg-emerald-500/20 flex items-center justify-center">
                   <Wallet className="w-6 h-6 text-emerald-400" />
@@ -136,15 +132,15 @@ export default function HomePage() {
         </div>
 
         {/* CTA Section */}
-        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-12 text-center max-w-3xl mx-auto border border-white/15 animate-fade-in-up">
+        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-12 text-center max-w-3xl mx-auto border border-white/15">
           <PieChart className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
           <h2 className="text-3xl font-bold mb-4">Ready to master your finances?</h2>
           <p className="text-white/60 mb-7">
             Join people who manage money smarter with RFin — track, split, and settle with zero math headaches.
           </p>
           <Link
-            href="/signup"
-            className="press sheen inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-600 text-white font-semibold shadow-lg shadow-emerald-500/30"
+            href="/auth/signup"
+            className="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg bg-gradient-to-r from-emerald-400 to-emerald-600 text-white font-semibold shadow-lg shadow-emerald-500/30"
           >
             Start Your Journey
             <ArrowRight className="w-5 h-5" />

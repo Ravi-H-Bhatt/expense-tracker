@@ -25,9 +25,9 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "RFin - AI-Powered Expense Tracker",
-  description: "Premium minimalist expense tracker with AI-powered insights. Track expenses, manage budgets, and get smart financial recommendations.",
-  keywords: ["expense tracker", "budget manager", "AI finance", "personal finance", "money management"],
+  title: "RFin - Smart Financial Workspace",
+  description: "Professional expense tracking and group financial management. Split expenses, track budgets, and manage your finances with AI-powered insights.",
+  keywords: ["expense tracker", "budget manager", "AI finance", "personal finance", "money management", "group expenses", "splitwise"],
 };
 
 export default function RootLayout({

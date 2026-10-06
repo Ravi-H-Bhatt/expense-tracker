@@ -4,6 +4,7 @@ import { parseCommand } from '@/lib/ai/command-parser';
 import { answerFinancialQuery } from '@/lib/ai/insights-generator';
 import { checkRateLimit } from '@/lib/ai/groq-client';
 import { getCurrentMonth, getCurrentYear } from '@/lib/format';
+import { logActivity } from '@/lib/audit-log';
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,6 +60,19 @@ export async function POST(request: NextRequest) {
           } else {
             actionPerformed = true;
             responseMessage = `✓ Added ₹${parsed.expense.amount} expense for ${parsed.expense.category}${parsed.expense.notes ? ` - ${parsed.expense.notes}` : ''}.`;
+            
+            // Log activity
+            await logActivity({
+              action_type: 'expense_created',
+              entity_type: 'expense',
+              entity_id: data[0]?.id,
+              metadata: {
+                amount: parsed.expense.amount,
+                category: parsed.expense.category,
+                via_ai: true,
+                notes: parsed.expense.notes
+              }
+            });
           }
         } else {
           responseMessage = "I couldn't extract the expense details from your message. Please try again with the amount and category.";
@@ -88,6 +102,20 @@ export async function POST(request: NextRequest) {
           } else {
             actionPerformed = true;
             responseMessage = `✓ Set ${parsed.budget.category} budget to ₹${parsed.budget.amount} for this month.`;
+            
+            // Log activity
+            await logActivity({
+              action_type: 'budget_created',
+              entity_type: 'budget',
+              entity_id: data[0]?.id,
+              metadata: {
+                category: parsed.budget.category,
+                amount: parsed.budget.amount,
+                month,
+                year,
+                via_ai: true
+              }
+            });
           }
         } else {
           responseMessage = "I couldn't extract the budget details. Please specify the category and amount.";

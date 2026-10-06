@@ -1,12 +1,3 @@
-// SETUP REQUIRED IN SUPABASE DASHBOARD:
-// 1. Go to Authentication → Providers → Google → Enable
-// 2. Add your Google OAuth Client ID and Secret
-//    (Get from: console.cloud.google.com → APIs & Services → Credentials)
-// 3. In Google Console, add Authorized redirect URI:
-//    https://<your-supabase-project>.supabase.co/auth/v1/callback
-// 4. In Supabase Auth settings, add Site URL: https://expense-tracker-rk-5.netlify.app
-// 5. Add redirect URL: https://expense-tracker-rk-5.netlify.app/auth/callback
-
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
@@ -14,6 +5,8 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { RFinLogo } from '@/components/ui/rfin-logo';
+import { Eye, EyeOff } from 'lucide-react';
 
 function LoginForm() {
   const router = useRouter();
@@ -21,10 +14,10 @@ function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const supabase = createClient();
 
-  // Surface OAuth callback errors (e.g. provider not enabled / cancelled)
   useEffect(() => {
     const oauthError = searchParams?.get('error');
     if (oauthError) {
@@ -46,8 +39,6 @@ function LoginForm() {
 
       toast.success('Welcome back!');
       const returnTo = searchParams?.get('returnTo') || '/dashboard';
-      // Hard navigation so the server-side middleware immediately sees the
-      // freshly-set auth cookie (avoids bouncing back to the login page).
       window.location.assign(returnTo);
     } catch (error: any) {
       toast.error(error.message || 'Failed to sign in');
@@ -62,8 +53,6 @@ function LoginForm() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          // Must EXACTLY match a URL in Supabase's Redirect URLs allowlist.
-          // Keep it clean (no query string) so Supabase doesn't fall back to Site URL.
           redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
@@ -76,100 +65,65 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row">
-      {/* Mobile gradient bar */}
-      <div className="h-2 w-full bg-gradient-to-r from-[#065F46] via-[#047857] to-[#10B981] md:hidden" />
-
-      {/* Left Panel - Brand Story */}
-      <div className="hidden md:flex md:w-[45%] min-h-screen relative overflow-hidden">
-        {/* Gradient Background */}
-        <div 
-          className="absolute inset-0" 
-          style={{
-            background: 'linear-gradient(145deg, #065F46 0%, #047857 40%, #10B981 100%)'
-          }}
-        />
-
-        {/* Noise texture overlay */}
-        <div 
-          className="absolute inset-0 opacity-[0.08]"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' /%3E%3C/svg%3E")`,
-            backgroundRepeat: 'repeat',
-            backgroundSize: '128px 128px'
-          }}
-        />
-
-        {/* Content */}
-        <div className="relative z-10 flex flex-col items-center justify-center px-12 text-white w-full">
-          {/* Logo & Wordmark */}
-          <div className="mb-8 text-center">
-            <svg width="56" height="56" viewBox="0 0 56 56" className="mx-auto mb-4" fill="white">
-              <path d="M28 4 L32 20 L48 20 L35 29 L40 45 L28 36 L16 45 L21 29 L8 20 L24 20 Z" />
-            </svg>
-            <h1 className="text-[2rem] font-['var(--font-playfair)'] font-semibold">RFin</h1>
+    <div className="min-h-screen flex">
+      {/* Left Panel - Branding */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-emerald-600 via-emerald-700 to-emerald-800 relative overflow-hidden">
+        {/* Subtle pattern overlay */}
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.03"%3E%3Ccircle cx="7" cy="7" r="1"/%3E%3Ccircle cx="37" cy="7" r="1"/%3E%3Ccircle cx="7" cy="37" r="1"/%3E%3Ccircle cx="37" cy="37" r="1"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')]" />
+        
+        <div className="relative z-10 flex flex-col justify-center px-16 text-white">
+          <div className="mb-12">
+            <RFinLogo size="lg" className="text-white mb-8" />
+            <h1 className="text-4xl font-light mb-6 leading-tight">
+              Your money,<br />finally understood.
+            </h1>
+            <p className="text-emerald-100 text-lg opacity-90">
+              Professional expense tracking with smart AI insights
+            </p>
           </div>
 
-          {/* Tagline */}
-          <p className="text-lg italic text-white/80 mb-12 font-['var(--font-dm-sans)'] text-center max-w-md">
-            Your money, finally understood.
-          </p>
-
-          {/* Feature Pills */}
-          <div className="space-y-4 w-full max-w-sm">
-            <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm">
-              <span className="text-xl">✦</span>
-              <span className="font-['var(--font-dm-sans)'] text-base">Smart expense splitting</span>
+          <div className="space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-2 h-2 rounded-full bg-white/60" />
+              <span className="text-emerald-50">Smart expense splitting</span>
             </div>
-            <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm">
-              <span className="text-xl">✦</span>
-              <span className="font-['var(--font-dm-sans)'] text-base">AI finance assistant</span>
+            <div className="flex items-center gap-4">
+              <div className="w-2 h-2 rounded-full bg-white/60" />
+              <span className="text-emerald-50">AI-powered insights</span>
             </div>
-            <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm">
-              <span className="text-xl">✦</span>
-              <span className="font-['var(--font-dm-sans)'] text-base">Group fund tracking</span>
+            <div className="flex items-center gap-4">
+              <div className="w-2 h-2 rounded-full bg-white/60" />
+              <span className="text-emerald-50">Group financial management</span>
             </div>
-          </div>
-
-          {/* Decorative SVG at bottom */}
-          <div className="absolute bottom-12">
-            <svg width="200" height="60" viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="30" cy="30" r="25" stroke="white" strokeWidth="1" opacity="0.06" fill="white" fillOpacity="0.02" />
-              <circle cx="100" cy="30" r="28" stroke="white" strokeWidth="1" opacity="0.06" fill="white" fillOpacity="0.02" />
-              <circle cx="170" cy="30" r="25" stroke="white" strokeWidth="1" opacity="0.06" fill="white" fillOpacity="0.02" />
-            </svg>
           </div>
         </div>
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex-1 md:w-[55%] min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6">
+      <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           {/* Mobile logo */}
-          <div className="md:hidden mb-8 text-center">
-            <svg width="48" height="48" viewBox="0 0 56 56" className="mx-auto mb-2" fill="#047857">
-              <path d="M28 4 L32 20 L48 20 L35 29 L40 45 L28 36 L16 45 L21 29 L8 20 L24 20 Z" />
-            </svg>
-            <h1 className="text-2xl font-['var(--font-playfair)'] font-semibold text-[#0F172A]">RFin</h1>
+          <div className="lg:hidden mb-8 text-center">
+            <RFinLogo size="md" />
           </div>
 
-          {/* Form Header */}
-          <div className="mb-8">
-            <h2 className="text-[2rem] font-['var(--font-playfair)'] font-semibold text-[#0F172A] mb-2">
+          {/* Form header */}
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-slate-900 mb-2">
               Welcome back
             </h2>
-            <p className="text-[#475569] font-['var(--font-dm-sans)'] text-sm">
-              Sign in to your expense tracker
+            <p className="text-slate-600">
+              Sign in to your financial workspace
             </p>
           </div>
 
-          {/* Google OAuth Button */}
+          {/* Google OAuth */}
           <button
             onClick={handleGoogleLogin}
             disabled={isLoading}
-            className="press w-full bg-white border border-[#E2E8F0] rounded-xl py-3 px-4 flex items-center justify-center gap-3 font-['var(--font-dm-sans)'] font-medium text-[#0F172A] hover:bg-[#F8FAFC] hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full mb-6 h-11 px-4 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-medium text-slate-900 transition-colors"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
               <path
                 fill="#4285F4"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -193,21 +147,20 @@ function LoginForm() {
           {/* Divider */}
           <div className="relative my-8">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[#E2E8F0]" />
+              <div className="w-full border-t border-slate-300" />
             </div>
             <div className="relative flex justify-center">
-              <span className="px-4 bg-[#F8FAFC] text-[#94A3B8] text-xs font-['var(--font-dm-sans)']">
+              <span className="bg-white px-4 text-sm text-slate-500">
                 or continue with email
               </span>
             </div>
           </div>
 
-          {/* Email/Password Form */}
+          {/* Email form */}
           <form onSubmit={handleEmailLogin} className="space-y-5">
-            {/* Email Field */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-['var(--font-dm-sans)'] text-[#475569] mb-1">
-                Email Address
+            <div className="space-y-2">
+              <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+                Email address
               </label>
               <input
                 id="email"
@@ -215,58 +168,55 @@ function LoginForm() {
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white placeholder:text-[#94A3B8] text-[#0F172A] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#10B981]"
                 required
                 disabled={isLoading}
+                className="w-full h-11 px-4 rounded-lg border border-slate-300 bg-white placeholder:text-slate-400 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
 
-            {/* Password Field */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-['var(--font-dm-sans)'] text-[#475569] mb-1">
+            <div className="space-y-2">
+              <label htmlFor="password" className="block text-sm font-medium text-slate-700">
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white placeholder:text-[#94A3B8] text-[#0F172A] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#10B981]"
-                required
-                disabled={isLoading}
-              />
-              <div className="text-right mt-1">
-                <Link href="#" className="text-xs text-[#047857] font-['var(--font-dm-sans)'] hover:underline">
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="w-full h-11 px-4 pr-10 rounded-lg border border-slate-300 bg-white placeholder:text-slate-400 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <div className="text-right">
+                <Link href="/auth/forgot-password" className="text-sm text-emerald-600 hover:text-emerald-700">
                   Forgot password?
                 </Link>
               </div>
             </div>
 
-            {/* Sign In Button */}
             <button
               type="submit"
               disabled={isLoading}
-              className="press w-full bg-[#047857] text-white rounded-xl py-3 px-4 font-['var(--font-dm-sans)'] font-medium hover:bg-[#065F46] hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-11 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Signing in...
-                </span>
-              ) : (
-                'Sign In'
-              )}
+              {isLoading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
 
-          {/* Sign Up Link */}
-          <p className="text-center text-sm font-['var(--font-dm-sans)'] text-[#475569] mt-6">
+          {/* Sign up link */}
+          <p className="text-center text-sm text-slate-600 mt-8">
             Don't have an account?{' '}
-            <Link href="/auth/signup" className="text-[#047857] font-semibold hover:underline">
+            <Link href="/auth/signup" className="text-emerald-600 hover:text-emerald-700 font-medium">
               Sign up
             </Link>
           </p>
@@ -279,8 +229,8 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
-        <div className="text-[#475569]">Loading...</div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-slate-600">Loading...</div>
       </div>
     }>
       <LoginForm />

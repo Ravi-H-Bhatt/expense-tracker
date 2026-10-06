@@ -2,6 +2,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { sendSettlementPendingEmail, sendSettlementConfirmationEmail } from '@/lib/email-service';
 import { resolveAppUrl } from '@/lib/app-url';
 import { NextRequest, NextResponse } from 'next/server';
+import { logActivity } from '@/lib/audit-log';
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,6 +60,19 @@ export async function POST(request: NextRequest) {
       }
 
       console.log('✅ Settlement created successfully:', settlement.id);
+      
+      // Log activity
+      await logActivity({
+        action_type: 'settlement_created',
+        entity_type: 'settlement',
+        entity_id: settlement.id,
+        group_id: groupId,
+        metadata: {
+          payer_id: payerId,
+          payee_id: payeeId,
+          amount: amount
+        }
+      });
 
       // Notify payee of pending settlement confirmation
       const { data: payer } = await supabase
@@ -207,6 +221,19 @@ export async function POST(request: NextRequest) {
       }
 
       console.log('✅ Settlement confirmed successfully:', updatedSettlement.id);
+      
+      // Log activity
+      await logActivity({
+        action_type: 'settlement_confirmed',
+        entity_type: 'settlement',
+        entity_id: settlement.id,
+        group_id: groupId,
+        metadata: {
+          payer_id: payerId,
+          payee_id: payeeId,
+          amount: amount
+        }
+      });
 
       // Resolve the payee's display name first — we need it to scope which
       // expenses this settlement actually covers.
@@ -382,6 +409,19 @@ export async function POST(request: NextRequest) {
       }
 
       console.log('✅ Settlement rejected successfully:', updatedSettlement.id);
+      
+      // Log activity
+      await logActivity({
+        action_type: 'settlement_rejected',
+        entity_type: 'settlement',
+        entity_id: settlement.id,
+        group_id: groupId,
+        metadata: {
+          payer_id: payerId,
+          payee_id: payeeId,
+          amount: amount
+        }
+      });
 
       // Notify payer of rejection
       const { data: payee } = await supabase

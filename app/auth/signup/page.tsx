@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { RFinLogo } from '@/components/ui/rfin-logo';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -13,6 +15,8 @@ export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const supabase = createClient();
 
@@ -44,16 +48,12 @@ export default function SignupPage() {
 
       if (error) throw error;
 
-      // If email confirmation is OFF in Supabase, signUp returns a session and
-      // the user is logged in immediately — send them straight to the dashboard.
       if (data.session) {
         toast.success('Account created! Welcome to RFin.');
         window.location.assign('/dashboard');
         return;
       }
 
-      // Otherwise try to sign them in right away (works when confirmation is off
-      // but no session was returned). If that fails, confirmation is required.
       const { data: signInData, error: signInError } =
         await supabase.auth.signInWithPassword({ email, password });
 
@@ -78,7 +78,6 @@ export default function SignupPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          // Must EXACTLY match a Supabase Redirect URL (no query string).
           redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
@@ -91,100 +90,65 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row">
-      {/* Mobile gradient bar */}
-      <div className="h-2 w-full bg-gradient-to-r from-[#065F46] via-[#047857] to-[#10B981] md:hidden" />
-
-      {/* Left Panel - Brand Story */}
-      <div className="hidden md:flex md:w-[45%] min-h-screen relative overflow-hidden">
-        {/* Gradient Background */}
-        <div 
-          className="absolute inset-0" 
-          style={{
-            background: 'linear-gradient(145deg, #065F46 0%, #047857 40%, #10B981 100%)'
-          }}
-        />
-
-        {/* Noise texture overlay */}
-        <div 
-          className="absolute inset-0 opacity-[0.08]"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' /%3E%3C/svg%3E")`,
-            backgroundRepeat: 'repeat',
-            backgroundSize: '128px 128px'
-          }}
-        />
-
-        {/* Content */}
-        <div className="relative z-10 flex flex-col items-center justify-center px-12 text-white w-full">
-          {/* Logo & Wordmark */}
-          <div className="mb-8 text-center">
-            <svg width="56" height="56" viewBox="0 0 56 56" className="mx-auto mb-4" fill="white">
-              <path d="M28 4 L32 20 L48 20 L35 29 L40 45 L28 36 L16 45 L21 29 L8 20 L24 20 Z" />
-            </svg>
-            <h1 className="text-[2rem] font-['var(--font-playfair)'] font-semibold">RFin</h1>
+    <div className="min-h-screen flex">
+      {/* Left Panel - Branding */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-emerald-600 via-emerald-700 to-emerald-800 relative overflow-hidden">
+        {/* Subtle pattern overlay */}
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.03"%3E%3Ccircle cx="7" cy="7" r="1"/%3E%3Ccircle cx="37" cy="7" r="1"/%3E%3Ccircle cx="7" cy="37" r="1"/%3E%3Ccircle cx="37" cy="37" r="1"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')]" />
+        
+        <div className="relative z-10 flex flex-col justify-center px-16 text-white">
+          <div className="mb-12">
+            <RFinLogo size="lg" className="text-white mb-8" />
+            <h1 className="text-4xl font-light mb-6 leading-tight">
+              Your money,<br />finally understood.
+            </h1>
+            <p className="text-emerald-100 text-lg opacity-90">
+              Join thousands managing their finances smarter
+            </p>
           </div>
 
-          {/* Tagline */}
-          <p className="text-lg italic text-white/80 mb-12 font-['var(--font-dm-sans)'] text-center max-w-md">
-            Your money, finally understood.
-          </p>
-
-          {/* Feature Pills */}
-          <div className="space-y-4 w-full max-w-sm">
-            <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm">
-              <span className="text-xl">✦</span>
-              <span className="font-['var(--font-dm-sans)'] text-base">Smart expense splitting</span>
+          <div className="space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-2 h-2 rounded-full bg-white/60" />
+              <span className="text-emerald-50">Smart expense splitting</span>
             </div>
-            <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm">
-              <span className="text-xl">✦</span>
-              <span className="font-['var(--font-dm-sans)'] text-base">AI finance assistant</span>
+            <div className="flex items-center gap-4">
+              <div className="w-2 h-2 rounded-full bg-white/60" />
+              <span className="text-emerald-50">AI-powered insights</span>
             </div>
-            <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm">
-              <span className="text-xl">✦</span>
-              <span className="font-['var(--font-dm-sans)'] text-base">Group fund tracking</span>
+            <div className="flex items-center gap-4">
+              <div className="w-2 h-2 rounded-full bg-white/60" />
+              <span className="text-emerald-50">Group financial management</span>
             </div>
-          </div>
-
-          {/* Decorative SVG at bottom */}
-          <div className="absolute bottom-12">
-            <svg width="200" height="60" viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="30" cy="30" r="25" stroke="white" strokeWidth="1" opacity="0.06" fill="white" fillOpacity="0.02" />
-              <circle cx="100" cy="30" r="28" stroke="white" strokeWidth="1" opacity="0.06" fill="white" fillOpacity="0.02" />
-              <circle cx="170" cy="30" r="25" stroke="white" strokeWidth="1" opacity="0.06" fill="white" fillOpacity="0.02" />
-            </svg>
           </div>
         </div>
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex-1 md:w-[55%] min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6">
+      <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           {/* Mobile logo */}
-          <div className="md:hidden mb-8 text-center">
-            <svg width="48" height="48" viewBox="0 0 56 56" className="mx-auto mb-2" fill="#047857">
-              <path d="M28 4 L32 20 L48 20 L35 29 L40 45 L28 36 L16 45 L21 29 L8 20 L24 20 Z" />
-            </svg>
-            <h1 className="text-2xl font-['var(--font-playfair)'] font-semibold text-[#0F172A]">RFin</h1>
+          <div className="lg:hidden mb-8 text-center">
+            <RFinLogo size="md" />
           </div>
 
-          {/* Form Header */}
-          <div className="mb-8">
-            <h2 className="text-[2rem] font-['var(--font-playfair)'] font-semibold text-[#0F172A] mb-2">
+          {/* Form header */}
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-slate-900 mb-2">
               Create your account
             </h2>
-            <p className="text-[#475569] font-['var(--font-dm-sans)'] text-sm">
+            <p className="text-slate-600">
               Start tracking smarter today
             </p>
           </div>
 
-          {/* Google OAuth Button */}
+          {/* Google OAuth */}
           <button
             onClick={handleGoogleSignup}
             disabled={isLoading}
-            className="press w-full bg-white border border-[#E2E8F0] rounded-xl py-3 px-4 flex items-center justify-center gap-3 font-['var(--font-dm-sans)'] font-medium text-[#0F172A] hover:bg-[#F8FAFC] hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full mb-6 h-11 px-4 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-medium text-slate-900 transition-colors"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
               <path
                 fill="#4285F4"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -208,21 +172,20 @@ export default function SignupPage() {
           {/* Divider */}
           <div className="relative my-8">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[#E2E8F0]" />
+              <div className="w-full border-t border-slate-300" />
             </div>
             <div className="relative flex justify-center">
-              <span className="px-4 bg-[#F8FAFC] text-[#94A3B8] text-xs font-['var(--font-dm-sans)']">
+              <span className="bg-white px-4 text-sm text-slate-500">
                 or continue with email
               </span>
             </div>
           </div>
 
-          {/* Signup Form */}
+          {/* Signup form */}
           <form onSubmit={handleSignup} className="space-y-5">
-            {/* Full Name Field */}
-            <div>
-              <label htmlFor="name" className="block text-sm font-['var(--font-dm-sans)'] text-[#475569] mb-1">
-                Full Name
+            <div className="space-y-2">
+              <label htmlFor="name" className="block text-sm font-medium text-slate-700">
+                Full name
               </label>
               <input
                 id="name"
@@ -230,16 +193,15 @@ export default function SignupPage() {
                 placeholder="John Doe"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white placeholder:text-[#94A3B8] text-[#0F172A] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#10B981]"
                 required
                 disabled={isLoading}
+                className="w-full h-11 px-4 rounded-lg border border-slate-300 bg-white placeholder:text-slate-400 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
 
-            {/* Email Field */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-['var(--font-dm-sans)'] text-[#475569] mb-1">
-                Email Address
+            <div className="space-y-2">
+              <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+                Email address
               </label>
               <input
                 id="email"
@@ -247,70 +209,75 @@ export default function SignupPage() {
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white placeholder:text-[#94A3B8] text-[#0F172A] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#10B981]"
                 required
                 disabled={isLoading}
+                className="w-full h-11 px-4 rounded-lg border border-slate-300 bg-white placeholder:text-slate-400 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
 
-            {/* Password Field */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-['var(--font-dm-sans)'] text-[#475569] mb-1">
+            <div className="space-y-2">
+              <label htmlFor="password" className="block text-sm font-medium text-slate-700">
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white placeholder:text-[#94A3B8] text-[#0F172A] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#10B981]"
-                required
-                disabled={isLoading}
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="w-full h-11 px-4 pr-10 rounded-lg border border-slate-300 bg-white placeholder:text-slate-400 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
 
-            {/* Confirm Password Field */}
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-['var(--font-dm-sans)'] text-[#475569] mb-1">
-                Confirm Password
+            <div className="space-y-2">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700">
+                Confirm password
               </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full border border-[#E2E8F0] rounded-xl px-4 py-3 bg-white placeholder:text-[#94A3B8] text-[#0F172A] font-['var(--font-dm-sans)'] focus:outline-none focus:ring-2 focus:ring-[#10B981]"
-                required
-                disabled={isLoading}
-              />
+              <div className="relative">
+                <input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  className="w-full h-11 px-4 pr-10 rounded-lg border border-slate-300 bg-white placeholder:text-slate-400 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
 
-            {/* Create Account Button */}
             <button
               type="submit"
               disabled={isLoading}
-              className="press w-full bg-[#047857] text-white rounded-xl py-3 px-4 font-['var(--font-dm-sans)'] font-medium hover:bg-[#065F46] hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-11 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Creating account...
-                </span>
-              ) : (
-                'Create Account'
-              )}
+              {isLoading ? 'Creating account...' : 'Create account'}
             </button>
           </form>
 
-          {/* Sign In Link */}
-          <p className="text-center text-sm font-['var(--font-dm-sans)'] text-[#475569] mt-6">
+          {/* Sign in link */}
+          <p className="text-center text-sm text-slate-600 mt-8">
             Already have an account?{' '}
-            <Link href="/auth/login" className="text-[#047857] font-semibold hover:underline">
+            <Link href="/auth/login" className="text-emerald-600 hover:text-emerald-700 font-medium">
               Sign in
             </Link>
           </p>
