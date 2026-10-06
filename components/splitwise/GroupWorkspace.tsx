@@ -81,12 +81,6 @@ function computeBalances(expenses: any[], splits: any[], members: any[]) {
       amount_owed: s.amount_owed
     }))
   });
-    sampleSplits: relevantSplits.slice(0, 10).map(s => ({
-      expense_id: s.expense_id,
-      display_name: s.display_name,
-      amount_owed: s.amount_owed
-    }))
-  });
 
   // Sum up all splits for each person
   relevantSplits.forEach(split => {
