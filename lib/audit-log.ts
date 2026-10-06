@@ -1,4 +1,4 @@
-import { createClient } from '@/utils/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from './admin-auth'
 import { headers } from 'next/headers'
 
