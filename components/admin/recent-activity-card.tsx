@@ -35,9 +35,9 @@ export async function RecentActivityCard() {
                       <Badge variant="secondary" className="text-xs">
                         {formatActionType(log.action_type)}
                       </Badge>
-                      {log.actor_user_id && (
+                      {log.actor_email && (
                         <span className="text-sm text-slate-600">
-                          by {(log as any).actor?.email || 'Unknown'}
+                          by {log.actor_email}
                         </span>
                       )}
                     </div>
