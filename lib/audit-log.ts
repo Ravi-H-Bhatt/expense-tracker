@@ -202,8 +202,8 @@ async function getUserGroupIds(userId: string): Promise<string> {
 }
 
 // Format action type for display
-export function formatActionType(actionType: ActionType): string {
-  const actionMap: Record<ActionType, string> = {
+export function formatActionType(actionType: string): string {
+  const actionMap: Record<string, string> = {
     login: 'Logged in',
     logout: 'Logged out',
     expense_created: 'Created expense',
@@ -224,6 +224,9 @@ export function formatActionType(actionType: ActionType): string {
     payment_request_created: 'Created payment request',
     payment_request_accepted: 'Accepted payment request',
     payment_request_rejected: 'Rejected payment request',
+    budget_created: 'Created budget',
+    budget_updated: 'Updated budget',
+    budget_deleted: 'Deleted budget',
     pdf_exported: 'Exported PDF',
     maintenance_enabled: 'Enabled maintenance mode',
     maintenance_disabled: 'Disabled maintenance mode',
