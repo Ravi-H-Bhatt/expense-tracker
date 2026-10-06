@@ -5,6 +5,7 @@ import { headers } from 'next/headers'
 export interface ActivityLog {
   id: string
   actor_user_id?: string
+  actor_email?: string
   action_type: string
   entity_type: string
   entity_id?: string
@@ -37,6 +38,9 @@ export type ActionType =
   | 'payment_request_created'
   | 'payment_request_accepted'
   | 'payment_request_rejected'
+  | 'budget_created'
+  | 'budget_updated'
+  | 'budget_deleted'
   | 'pdf_exported'
   | 'maintenance_enabled'
   | 'maintenance_disabled'
@@ -48,6 +52,7 @@ export type EntityType =
   | 'user'
   | 'expense'
   | 'group'
+  | 'budget'
   | 'settlement'
   | 'payment_request'
   | 'system'
