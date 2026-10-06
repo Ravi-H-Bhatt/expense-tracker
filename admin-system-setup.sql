@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS admin_users (
 CREATE TABLE IF NOT EXISTS activity_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   actor_user_id UUID REFERENCES auth.users(id),
+  actor_email TEXT,
   action_type TEXT NOT NULL,
   entity_type TEXT NOT NULL,
   entity_id UUID,
