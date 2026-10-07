@@ -33,38 +33,30 @@ export default function CreateGroupModal({ onClose, onGroupCreated, currentUser 
     setIsCreating(true);
 
     try {
-      // Create group
-      const { data: group, error: groupError } = await supabase
-        .from('split_groups')
-        .insert({
-          name: name.trim(),
-          description: description.trim() || null,
-          created_by: currentUser.id,
-          group_fund: groupFund ? parseFloat(groupFund) : 0
-        })
-        .select()
-        .single();
-
-      if (groupError) throw groupError;
-
-      // Add creator as member
       const displayName = resolveDisplayName(currentUser, currentUser?.profile);
       
-      const { error: memberError } = await supabase
-        .from('group_members')
-        .insert({
-          group_id: group.id,
-          user_id: currentUser.id,
+      const response = await fetch('/api/groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          description: description.trim() || null,
+          group_fund: groupFund ? parseFloat(groupFund) : 0,
           display_name: displayName
-        });
+        })
+      });
 
-      if (memberError) throw memberError;
+      const result = await response.json();
 
-      setCreatedGroup(group);
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create group');
+      }
+
+      setCreatedGroup(result.group);
       // Don't close modal yet - show invite link
 
     } catch (error: any) {
-      toast.error('Failed to create group');
+      toast.error(error.message || 'Failed to create group');
       console.error(error);
       setIsCreating(false);
     }

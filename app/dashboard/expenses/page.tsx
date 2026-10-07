@@ -228,6 +228,25 @@ export default function ExpensesPage() {
         });
 
         pdfGen.save(`Personal_Expenses_${monthNames[selectedMonth]}_${selectedYear}.pdf`);
+        
+        // Log PDF export activity
+        fetch('/api/activity/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action_type: 'pdf_exported',
+            entity_type: 'expense',
+            metadata: {
+              report_type: 'monthly',
+              month: monthNames[selectedMonth],
+              year: selectedYear,
+              expense_count: filteredByMonth.length,
+              total_amount: totalAmount
+            }
+          })
+        }).catch(console.error);
+        
+        toast.success('Monthly report exported successfully!');
       } else {
         // Yearly report
         const monthlyData = monthNames.map((month, index) => {
@@ -287,9 +306,26 @@ export default function ExpensesPage() {
         });
 
         pdfGen.save(`Personal_Expenses_Annual_${selectedYear}.pdf`);
+        
+        // Log PDF export activity
+        fetch('/api/activity/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action_type: 'pdf_exported',
+            entity_type: 'expense',
+            metadata: {
+              report_type: 'yearly',
+              year: selectedYear,
+              expense_count: yearExpenses.length,
+              total_amount: totalAmount
+            }
+          })
+        }).catch(console.error);
+        
+        toast.success('Annual report exported successfully!');
       }
 
-      toast.success('Report downloaded successfully!');
       setShowExportMenu(false);
     } catch (error) {
       console.error('Error generating report:', error);
