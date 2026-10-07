@@ -69,7 +69,7 @@ export function ActivityFilters() {
               <SelectValue placeholder="Action type..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All actions</SelectItem>
+              <SelectItem value="all">All actions</SelectItem>
               {actionTypes.map(action => (
                 <SelectItem key={action} value={action}>
                   {action.replace('_', ' ')}
@@ -83,7 +83,7 @@ export function ActivityFilters() {
               <SelectValue placeholder="Entity type..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All entities</SelectItem>
+              <SelectItem value="all">All entities</SelectItem>
               {entityTypes.map(entity => (
                 <SelectItem key={entity} value={entity}>
                   {entity}
