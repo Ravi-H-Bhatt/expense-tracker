@@ -97,19 +97,17 @@ export default function ExpensesPage() {
     setIsSaving(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { error } = await supabase.from('expenses').insert({
-        user_id: user.id,
-        amount: parseFloat(formData.amount),
-        category: formData.category,
-        notes: formData.notes || null,
-        payment_method: formData.payment_method || null,
-        expense_date: formData.expense_date,
+      const response = await fetch('/api/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
       });
 
-      if (error) throw error;
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to add expense');
+      }
 
       toast.success('Expense added successfully!');
       setIsAddDialogOpen(false);
@@ -126,17 +124,20 @@ export default function ExpensesPage() {
     if (!confirm('Are you sure you want to delete this expense?')) return;
 
     try {
-      const { error } = await supabase
-        .from('expenses')
-        .delete()
-        .eq('id', id);
+      const response = await fetch(`/api/expenses?id=${id}`, {
+        method: 'DELETE'
+      });
 
-      if (error) throw error;
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to delete expense');
+      }
 
       toast.success('Expense deleted');
       fetchExpenses();
-    } catch (error) {
-      toast.error('Failed to delete expense');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete expense');
     }
   };
 
