@@ -46,26 +46,26 @@ export default async function AdminLayout({
       <header className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-8">
+            <div className="flex items-center gap-4 md:gap-8">
               <Link href="/admin" className="flex items-center">
                 <RFinLogo size="sm" />
               </Link>
-              <nav className="flex items-center gap-6">
+              <nav className="flex items-center gap-3 md:gap-6">
                 <Link 
                   href="/admin" 
-                  className="text-sm font-medium text-slate-600 hover:text-slate-900"
+                  className="text-xs md:text-sm font-medium text-slate-600 hover:text-slate-900"
                 >
                   Dashboard
                 </Link>
                 <Link 
                   href="/admin/activity" 
-                  className="text-sm font-medium text-slate-600 hover:text-slate-900"
+                  className="text-xs md:text-sm font-medium text-slate-600 hover:text-slate-900"
                 >
-                  Activity Logs
+                  Activity
                 </Link>
                 <Link 
                   href="/admin/settings" 
-                  className="text-sm font-medium text-slate-600 hover:text-slate-900"
+                  className="text-xs md:text-sm font-medium text-slate-600 hover:text-slate-900"
                 >
                   Settings
                 </Link>
@@ -74,9 +74,10 @@ export default async function AdminLayout({
             <div className="flex items-center gap-4">
               <Link 
                 href="/dashboard"
-                className="text-sm font-medium text-slate-600 hover:text-slate-900"
+                className="text-xs md:text-sm font-medium text-slate-600 hover:text-slate-900"
               >
-                Back to App
+                <span className="hidden md:inline">Back to App</span>
+                <span className="md:hidden">Back</span>
               </Link>
             </div>
           </div>
