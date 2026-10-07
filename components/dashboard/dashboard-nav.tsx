@@ -51,16 +51,29 @@ export default function DashboardNav({ user, profile }: DashboardNavProps) {
   }, [user]);
 
   const checkAdminStatus = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('❌ No user logged in');
+      return;
+    }
     
-    const { data } = await supabase
+    console.log('🔍 Checking admin status for user:', user.id, user.email);
+    
+    const { data, error } = await supabase
       .from('admin_users')
-      .select('role')
+      .select('*')
       .eq('id', user.id)
       .eq('is_active', true)
       .single();
     
-    setIsAdmin(!!data);
+    console.log('📊 Admin check result:', { data, error });
+    
+    if (data) {
+      console.log('✅ User IS admin:', data.role);
+      setIsAdmin(true);
+    } else {
+      console.log('❌ User is NOT admin');
+      setIsAdmin(false);
+    }
   };
 
   const handleSignOut = async () => {
