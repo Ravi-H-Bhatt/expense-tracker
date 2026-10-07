@@ -14,7 +14,18 @@ interface PageProps {
 }
 
 export default async function ActivityLogPage({ searchParams }: PageProps) {
-  await requireAdmin()
+  try {
+    await requireAdmin()
+  } catch (error) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <h2 className="text-red-800 font-semibold">Access Denied</h2>
+          <p className="text-red-600">You need admin privileges to view activity logs.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
