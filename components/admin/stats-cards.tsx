@@ -5,16 +5,16 @@ import { Users, DollarSign, Activity, Shield } from 'lucide-react'
 export async function StatsCards() {
   const supabase = await createClient()
 
-  // Get stats
+  // Get stats - count from auth.users for total users
   const [
     { count: totalUsers },
     { count: totalExpenses },
     { count: activeGroups },
     { count: adminUsers }
   ] = await Promise.all([
-    supabase.from('users').select('*', { count: 'exact', head: true }),
+    supabase.auth.admin.listUsers().then(res => ({ count: res.data.users?.length || 0 })),
     supabase.from('group_expenses').select('*', { count: 'exact', head: true }),
-    supabase.from('split_groups').select('*', { count: 'exact', head: true }).eq('is_active', true),
+    supabase.from('split_groups').select('*', { count: 'exact', head: true }),
     supabase.from('admin_users').select('*', { count: 'exact', head: true }).eq('is_active', true)
   ])
 
