@@ -1,45 +1,58 @@
-import { createClient } from '@/lib/supabase/server'
+'use client'
+
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Users, DollarSign, Activity, Shield } from 'lucide-react'
 
-export async function StatsCards() {
-  const supabase = await createClient()
+export function StatsCards() {
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    totalExpenses: 0,
+    activeGroups: 0,
+    adminUsers: 0
+  })
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Get stats - count from auth.users for total users
-  const [
-    { count: totalUsers },
-    { count: totalExpenses },
-    { count: activeGroups },
-    { count: adminUsers }
-  ] = await Promise.all([
-    supabase.auth.admin.listUsers().then(res => ({ count: res.data.users?.length || 0 })),
-    supabase.from('group_expenses').select('*', { count: 'exact', head: true }),
-    supabase.from('split_groups').select('*', { count: 'exact', head: true }),
-    supabase.from('admin_users').select('*', { count: 'exact', head: true }).eq('is_active', true)
-  ])
+  useEffect(() => {
+    fetchStats()
+  }, [])
 
-  const stats = [
+  const fetchStats = async () => {
+    try {
+      const response = await fetch('/api/admin/stats')
+      if (response.ok) {
+        const data = await response.json()
+        setStats(data)
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const statCards = [
     {
       title: 'Total Users',
-      value: totalUsers?.toString() || '0',
+      value: stats.totalUsers.toString(),
       icon: Users,
       description: 'Registered users'
     },
     {
       title: 'Total Expenses',
-      value: totalExpenses?.toString() || '0',
+      value: stats.totalExpenses.toString(),
       icon: DollarSign,
       description: 'All time expenses'
     },
     {
       title: 'Active Groups',
-      value: activeGroups?.toString() || '0',
+      value: stats.activeGroups.toString(),
       icon: Activity,
       description: 'Currently active'
     },
     {
       title: 'Admin Users',
-      value: adminUsers?.toString() || '0',
+      value: stats.adminUsers.toString(),
       icon: Shield,
       description: 'Active admins'
     }
@@ -47,7 +60,7 @@ export async function StatsCards() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {stats.map((stat) => {
+      {statCards.map((stat) => {
         const Icon = stat.icon
         return (
           <Card key={stat.title}>
@@ -59,7 +72,7 @@ export async function StatsCards() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-slate-900">
-                {stat.value}
+                {isLoading ? '...' : stat.value}
               </div>
               <p className="text-xs text-slate-500 mt-1">
                 {stat.description}
