@@ -2,22 +2,19 @@ import { requireAdmin } from '@/lib/admin-auth'
 import { ActivityLogTable } from '@/components/admin/activity-log-table'
 import { ActivityFilters } from '@/components/admin/activity-filters'
 
-interface SearchParams {
-  page?: string
-  actor?: string
-  action?: string
-  entity?: string
-  from?: string
-  to?: string
+interface PageProps {
+  searchParams: {
+    page?: string
+    actor?: string
+    action?: string
+    entity?: string
+    from?: string
+    to?: string
+  }
 }
 
-export default async function ActivityLogPage({
-  searchParams
-}: {
-  searchParams: Promise<SearchParams>
-}) {
+export default async function ActivityLogPage({ searchParams }: PageProps) {
   await requireAdmin()
-  const params = await searchParams
 
   return (
     <div className="space-y-6">
@@ -29,7 +26,7 @@ export default async function ActivityLogPage({
       </div>
 
       <ActivityFilters />
-      <ActivityLogTable searchParams={params} />
+      <ActivityLogTable searchParams={searchParams} />
     </div>
   )
 }
