@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,8 @@ import {
   Settings, 
   LogOut,
   Menu,
-  X
+  X,
+  Shield
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -42,7 +43,25 @@ export default function DashboardNav({ user, profile }: DashboardNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const supabase = createClient();
+
+  useEffect(() => {
+    checkAdminStatus();
+  }, [user]);
+
+  const checkAdminStatus = async () => {
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from('admin_users')
+      .select('role')
+      .eq('id', user.id)
+      .eq('is_active', true)
+      .single();
+    
+    setIsAdmin(!!data);
+  };
 
   const handleSignOut = async () => {
     try {
@@ -111,6 +130,32 @@ export default function DashboardNav({ user, profile }: DashboardNavProps) {
                 </Link>
               );
             })}
+
+            {/* Admin Panel Button - Only for admins */}
+            {isAdmin && (
+              <>
+                <div className="pt-4 pb-2">
+                  <div className="px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Admin
+                  </div>
+                </div>
+                <Link href="/admin">
+                  <Button
+                    variant={pathname.startsWith('/admin') ? 'default' : 'ghost'}
+                    className={cn(
+                      "w-full justify-start font-medium",
+                      pathname.startsWith('/admin')
+                        ? "bg-orange-600 hover:bg-orange-700 text-white" 
+                        : "hover:bg-orange-50 text-orange-600"
+                    )}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <Shield className="w-5 h-5 mr-3" />
+                    Admin Panel
+                  </Button>
+                </Link>
+              </>
+            )}
           </nav>
 
           {/* User section */}
